@@ -1,0 +1,53 @@
+name: Crawl instagram (indie theaters)
+
+# 독립영화관 인스타 수집 (Apify → Gemini 파싱 → 이벤트·시간표 적재 + R2 이미지)
+# 하루 1회 저녁 — 독립관 게시물은 낮 시간대에 올라오므로 저녁에 하루치 수거.
+# 일상 모드는 계정당 최근 5개 + dedup이라 가볍다 (신규 게시물만 Gemini 파싱).
+# 과금 방어: budget-guard가 Apify 크레딧 80% 초과 시 스스로 중단 (fail-closed).
+on:
+  schedule:
+    # KST 21:00 (UTC 12:00)
+    - cron: "0 12 * * *"
+  workflow_dispatch: {} # 수동 실행
+
+concurrency:
+  group: insta
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  insta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20 # 일상 수집 수 분 + Gemini 재시도 여유
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run instagram crawl
+        run: pnpm --filter @cinemo/crawler insta
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          TMDB_ACCESS_TOKEN: ${{ secrets.TMDB_ACCESS_TOKEN }}
+          KOBIS_API_KEY: ${{ secrets.KOBIS_API_KEY }}
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
