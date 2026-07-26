@@ -43,7 +43,7 @@ pnpm --filter @cinemo/crawler <cgv|lotte|megabox|kobis-backfill|tmdb|cgv-schedul
   (위 `pnpm --filter` 스크립트가 이미 이걸 감싸므로, 가능하면 스크립트 사용.)
 - **환경변수**는 루트 `.env` (예시: `.env.example`). Turso · TMDB · KOBIS 키 + `CURL_IMPERSONATE_BIN`.
 - **CGV는 Cloudflare 우회 필요** — [lexiforest/curl-impersonate](https://github.com/lexiforest/curl-impersonate) 바이너리 경로를 `CURL_IMPERSONATE_BIN`에 지정. GitHub Actions에선 워크플로우가 자동 설치.
-- **자동화**: `.github/workflows/crawl.yml`(3시간마다, 특전/굿즈) · `schedule.yml`(매일 13시 KST, 상영시간표). 실패 시 GitHub 기본 알림. ⚠️ **2026-07-25 현재 Actions 사용 불가** (무료 분량 문제) — 크론 미작동 중, 갱신은 로컬 실행으로.
+- **자동화**: `.github/workflows/crawl.yml`(풀 1회 + 경량 4회/일, 특전/굿즈) · `schedule.yml`(매일 13시 KST, 상영시간표). 실패 시 GitHub 기본 알림. public 레포라 Actions 분량 무제한.
 - **10분 넘는 장기 실행(시드 등)은 세션 백그라운드 금지** — 터미널 닫으면 같이 죽는다 (07-25 상상마당 시드 중단 사고). `nohup <명령> > /tmp/시드.log 2>&1 &`로 세션과 분리하고 로그 파일로 확인할 것.
 - **배포**: Vercel — **https://mameil-cinemo.vercel.app** (master push 시 자동 배포, Root=apps/web, 환경변수는 Turso 2개만).
 - 영화는 **제목 정규화로 교차 체인 dedup** 후 KOBIS/TMDB 백필. (`db/movie-match.ts`)
@@ -66,4 +66,5 @@ pnpm --filter @cinemo/crawler <cgv|lotte|megabox|kobis-backfill|tmdb|cgv-schedul
 - **커밋/푸시 요청 시 기록 컨펌**: 사용자가 커밋·푸시를 요청하면 바로 커밋하지 말고
   ① 이번 작업을 작업 로그(frontend-tasks.md 등)에 기록할지 묻고
   ② 기록한다면 **기록 문구를 먼저 보여주고 컨펌받은 뒤** 커밋한다.
-- 레포는 현재 **private** (Actions 무제한용 public 전환은 키 재발급 + 히스토리 세탁 후 — 미완).
+- 레포는 **public** (`mameil/cinemo`, 2026-07-26 전환 — 키 박힌 옛 히스토리는 private `cinemo-archive`에 봉인, 로컬 `archive/master` 브랜치 = 옛 히스토리).
+- **public이므로 키·토큰·개인정보 커밋 절대 금지.** 커밋 전 의심되면 `git grep`으로 확인. 커밋 이메일은 noreply(`57998468+mameil@users.noreply.github.com`) 유지.
