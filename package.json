@@ -1,0 +1,21 @@
+{
+  "name": "cinemo",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @cinemo/web dev",
+    "build": "pnpm --filter @cinemo/web build",
+    "crawl": "pnpm --filter @cinemo/crawler start",
+    "crawl:schedule": "pnpm --filter @cinemo/crawler schedule"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.4",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3"
+  }
+}

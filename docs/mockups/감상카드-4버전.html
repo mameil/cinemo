@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>감상 카드 — 4버전 × 4작품</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#14161b; font-family:"Apple SD Gothic Neo",Pretendard,sans-serif;
+    display:flex; flex-wrap:wrap; gap:36px; justify-content:center; padding:36px;
+  }
+  .wrap { text-align:center; }
+  .label { color:#8a919c; font-size:13px; margin-bottom:10px; font-weight:700; }
+  .card {
+    width:432px; height:540px;
+    position:relative; overflow:hidden; border-radius:8px;
+    box-shadow:0 16px 48px rgba(0,0,0,.5); text-align:left;
+  }
+
+  /* ═══ A. 블러 배경 + 센터 포스터 — 호프 (영화) ═══ */
+  .a-bg { position:absolute; inset:-15%; background:url("hope-poster.jpg") center/cover;
+    filter:blur(38px) brightness(.55) saturate(1.15); transform:scale(1.25); }
+  .a-shade { position:absolute; inset:0;
+    background:linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,.6) 80%, rgba(0,0,0,.75) 100%); }
+  .a-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; padding:34px 30px 22px; }
+  .a-poster { width:196px; border-radius:9px; box-shadow:0 12px 36px rgba(0,0,0,.55); }
+  .a-text { margin-top:auto; width:100%; color:#fff; }
+  .a-meta { font-size:10.5px; color:rgba(255,255,255,.72); display:flex; gap:7px; align-items:center; margin-bottom:8px; }
+  .a-meta b { color:#fff; font-size:12px; }
+  .a-body { font-size:13.5px; line-height:1.72; font-weight:500; color:rgba(255,255,255,.96); word-break:keep-all; }
+  .a-credit { margin-top:10px; font-size:8px; color:rgba(255,255,255,.4); display:flex; justify-content:space-between; }
+
+  /* ═══ B. 매거진 — 2001 스페이스 오디세이 (영화) ═══ */
+  .b { background:#e9e5dc; }
+  .b-inner { position:absolute; inset:0; padding:34px 30px; display:flex; flex-direction:column; }
+  .b-head { font-size:9.5px; letter-spacing:.28em; color:#8a8378; margin-bottom:22px; display:flex; justify-content:space-between; }
+  .b-main { display:flex; gap:22px; }
+  .b-poster { width:172px; border-radius:4px; box-shadow:10px 12px 0 #b8342a, 0 10px 30px rgba(0,0,0,.25); }
+  .b-side { flex:1; display:flex; flex-direction:column; }
+  .b-title { font-size:22px; font-weight:800; color:#1c1a16; letter-spacing:-.02em; line-height:1.25; }
+  .b-sub { font-size:10px; color:#8a8378; margin-top:6px; line-height:1.6; }
+  .b-stars { color:#b8860b; font-size:12px; margin-top:10px; letter-spacing:2px; }
+  .b-body { margin-top:24px; font-size:13.5px; line-height:1.85; color:#33302a; word-break:keep-all; font-weight:500; }
+  .b-body::first-letter { font-size:2.1em; font-weight:800; float:left; line-height:1.05; margin-right:7px; color:#b8342a; }
+  .b-foot { margin-top:auto; border-top:1.5px solid #1c1a16; padding-top:10px;
+    display:flex; justify-content:space-between; font-size:8.5px; color:#8a8378; letter-spacing:.06em; }
+
+  /* ═══ C. 티켓 스텁 — 동궁 (드라마) ═══ */
+  .c { background:#f6f2ea; }
+  .c-top { height:46%; background:url("donggung.jpg") center 18%/cover; position:relative; }
+  .c-top::after { content:""; position:absolute; inset:0;
+    background:linear-gradient(to bottom, rgba(0,0,0,.02), rgba(0,0,0,.35)); }
+  .c-chip { position:absolute; top:14px; left:14px; background:rgba(0,0,0,.55); color:#fff;
+    font-size:9px; letter-spacing:.2em; padding:4px 9px; border-radius:3px; backdrop-filter:blur(4px); }
+  .c-perf { position:relative; height:0; border-top:2.5px dashed #c9c2b4; margin:0 16px; }
+  .c-perf::before, .c-perf::after { content:""; position:absolute; top:-11px; width:22px; height:22px;
+    border-radius:50%; background:#14161b; }
+  .c-perf::before { left:-27px; } .c-perf::after { right:-27px; }
+  .c-bottom { padding:20px 26px 18px; display:flex; flex-direction:column; height:54%; }
+  .c-title-row { display:flex; align-items:baseline; gap:10px; }
+  .c-title { font-size:23px; font-weight:800; color:#1c1a16; }
+  .c-stars { color:#b8860b; font-size:12px; letter-spacing:2px; }
+  .c-grid { display:flex; gap:18px; margin-top:12px; }
+  .c-cell small { display:block; font-size:7.5px; letter-spacing:.18em; color:#a39b8b; }
+  .c-cell span { font-size:11px; font-weight:700; color:#33302a; }
+  .c-body { margin-top:16px; font-size:13px; line-height:1.78; color:#3a362e; word-break:keep-all; font-weight:500; }
+  .c-foot { margin-top:auto; display:flex; justify-content:space-between; align-items:flex-end; }
+  .c-barcode { height:26px; width:120px;
+    background:repeating-linear-gradient(90deg,#1c1a16 0 2px,transparent 2px 5px,#1c1a16 5px 6px,transparent 6px 10px); }
+  .c-credit { font-size:8px; color:#a39b8b; }
+
+  /* ═══ D. 미니멀 — 작별하지 않는다 (책) ═══ */
+  .d { background:#1c2330; } /* 표지(눈밭의 푸른 밤) 딥톤 */
+  .d-inner { position:absolute; inset:0; padding:38px 36px; display:flex; flex-direction:column; color:#e8ecf2; }
+  .d-head { display:flex; align-items:center; gap:14px; }
+  .d-poster { width:64px; border-radius:4px; box-shadow:0 6px 18px rgba(0,0,0,.5); }
+  .d-ht b { display:block; font-size:19px; font-weight:800; }
+  .d-ht span { font-size:10px; color:rgba(232,236,242,.55); display:block; margin-top:4px; }
+  .d-stars { color:#f5c518; font-size:11px; letter-spacing:2px; margin-top:5px; display:block; }
+  .d-quote { margin-top:40px; font-size:18px; line-height:2.05; font-weight:600; word-break:keep-all; letter-spacing:-.01em; }
+  .d-quote::before { content:"“"; display:block; font-size:52px; color:rgba(232,236,242,.22); height:34px; font-family:Georgia,serif; }
+  .d-foot { margin-top:auto; display:flex; justify-content:space-between; font-size:8.5px; color:rgba(232,236,242,.4); }
+</style>
+</head>
+<body>
+
+  <!-- A · 호프 (영화) -->
+  <div class="wrap">
+    <p class="label">A. 블러+센터 — 호프 (영화)</p>
+    <div class="card">
+      <div class="a-bg"></div><div class="a-shade"></div>
+      <div class="a-inner">
+        <img class="a-poster" src="hope-poster.jpg">
+        <div class="a-text">
+          <div class="a-meta"><b>호프</b><span style="color:#f5c518">★★★★☆</span><span>2026.07.20 · 백석벨라시타 · 돌비</span></div>
+          <p class="a-body">숲이 화면 밖까지 번지는 기분. 돌비관 어둠 속에서 두 시간 내내 숨을 골랐다. 특전으로 받은 OT를 지갑에 넣으며, 올여름은 이 영화 전과 후로 나뉘겠다고 생각했다.</p>
+          <div class="a-credit"><span>ⓒ 포스터: 배급사 제공</span><span>@my.movie.log</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B · 2001 스페이스 오디세이 (영화) -->
+  <div class="wrap">
+    <p class="label">B. 매거진 — 2001 스페이스 오디세이 (영화)</p>
+    <div class="card b">
+      <div class="b-inner">
+        <div class="b-head"><span>CINEMA JOURNAL</span><span>NO. 048</span></div>
+        <div class="b-main">
+          <img class="b-poster" src="odyssey.jpg">
+          <div class="b-side">
+            <div class="b-title">2001<br>스페이스<br>오디세이</div>
+            <div class="b-sub">1968 · 스탠리 큐브릭<br>2026.07.12 재관람<br>CGV 용산 IMAX</div>
+            <div class="b-stars">★★★★★</div>
+          </div>
+        </div>
+        <p class="b-body">모노리스 앞의 유인원과 우주정거장의 왈츠 사이, 인류의 모든 시간이 한 컷에 접힌다. IMAX로 다시 보니 침묵이 이렇게 큰 소리였다는 걸 알겠다.</p>
+        <div class="b-foot"><span>ⓒ POSTER: WARNER BROS.</span><span>@my.movie.log</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C · 동궁 (드라마) -->
+  <div class="wrap">
+    <p class="label">C. 티켓 스텁 — 동궁 (드라마)</p>
+    <div class="card c">
+      <div class="c-top"><span class="c-chip">NOW STREAMING</span></div>
+      <div class="c-perf"></div>
+      <div class="c-bottom">
+        <div class="c-title-row"><span class="c-title">동궁</span><span class="c-stars">★★★★☆</span></div>
+        <div class="c-grid">
+          <div class="c-cell"><small>WATCHED</small><span>2026.07.19</span></div>
+          <div class="c-cell"><small>WHERE</small><span>넷플릭스</span></div>
+          <div class="c-cell"><small>PROGRESS</small><span>EP 1–4</span></div>
+          <div class="c-cell"><small>WITH</small><span>혼자, 새벽</span></div>
+        </div>
+        <p class="c-body">궁이라는 새장 안에서 모두가 조금씩 미쳐가는데, 카메라만 혼자 침착하다. 4화 엔딩에서 멈추지 못하고 다음 화를 눌러버렸다.</p>
+        <div class="c-foot"><div class="c-barcode"></div><span class="c-credit">ⓒ 포스터: 넷플릭스 · @my.movie.log</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- D · 작별하지 않는다 (책) -->
+  <div class="wrap">
+    <p class="label">D. 미니멀 — 작별하지 않는다 (책)</p>
+    <div class="card d">
+      <div class="d-inner">
+        <div class="d-head">
+          <img class="d-poster" src="farewell.jpg">
+          <div class="d-ht">
+            <b>작별하지 않는다</b>
+            <span>한강 · 문학동네 · 2026.07.15 완독</span>
+            <span class="d-stars">★★★★★</span>
+          </div>
+        </div>
+        <p class="d-quote">눈은 내리고, 새는 살아 있어야 하고, 나는 계속 읽어야 했다. 폭설 속을 걷는 문장들을 따라가다 보면 애도가 끝나지 않는 일이라는 걸 몸으로 알게 된다.</p>
+        <div class="d-foot"><span>ⓒ 표지: 문학동네</span><span>@my.movie.log</span></div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

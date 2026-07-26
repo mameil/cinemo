@@ -1,0 +1,56 @@
+name: Crawl showtimes (daily)
+
+# 상영시간표 수집 (롯데/메가/CGV) — 굿즈 크롤과 분리된 별도 잡.
+# 상영시간표는 무겁고 1주일 앞까지만 열려서 하루 1회면 충분하다.
+on:
+  schedule:
+    # 매일 04:00 UTC = 한국시간 13:00 (다음 주 예매 오픈분까지 반영)
+    - cron: "0 4 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: schedule
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  schedule:
+    runs-on: ubuntu-latest
+    # 상영시간표는 수집량이 커서 굿즈 크롤보다 여유를 둔다
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install curl-impersonate (Linux, CGV Cloudflare 우회)
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sL https://github.com/lexiforest/curl-impersonate/releases/download/v1.5.6/curl-impersonate-v1.5.6.x86_64-linux-gnu.tar.gz \
+            | tar -xz -C "$HOME/.local/bin" curl-impersonate
+          chmod +x "$HOME/.local/bin/curl-impersonate"
+
+      - name: Run schedule crawl
+        run: pnpm crawl:schedule
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          TMDB_ACCESS_TOKEN: ${{ secrets.TMDB_ACCESS_TOKEN }}
+          KOBIS_API_KEY: ${{ secrets.KOBIS_API_KEY }}
+          CURL_IMPERSONATE_BIN: /home/runner/.local/bin/curl-impersonate
+          # 수집 구역: 지정 안 하면 schedule-all.ts의 기본 구역(일산/서울 서부).
+          # 수도권 전체로 넓히려면 secrets/vars로 조정하거나 --all 사용 (무료 예산 주의).
+          SCHEDULE_ONLY: ${{ vars.SCHEDULE_ONLY }}

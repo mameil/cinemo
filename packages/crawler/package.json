@@ -1,0 +1,26 @@
+{
+  "name": "@cinemo/crawler",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "start": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/index.ts",
+    "cgv": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/cgv/index.ts",
+    "cgv-schedule": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/cgv/schedule.ts",
+    "megabox": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/megabox/index.ts",
+    "megabox-schedule": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/megabox/schedule.ts",
+    "lotte": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/lotte/index.ts",
+    "lotte-schedule": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/lotte/schedule.ts",
+    "kobis": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/kobis/index.ts",
+    "kobis-backfill": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/kobis-backfill.ts",
+    "tmdb": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/tmdb-sync.ts",
+    "schedule": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/schedule-all.ts",
+    "theater-geo": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/theater-geo.ts",
+    "insta": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/insta/index.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1091.0",
+    "@cinemo/shared": "workspace:*",
+    "cheerio": "^1.0.0"
+  }
+}

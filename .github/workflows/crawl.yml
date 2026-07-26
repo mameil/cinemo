@@ -1,0 +1,60 @@
+name: Crawl goods & movies
+
+# 크롤 파이프라인 정기 실행 (3사 수집·적재 → KOBIS 백필 → TMDB 포스터)
+# 2026-07-25: 업로드 시간 분석 기반 재배치 — Actions 무료 2,000분/월 초과 방지 (~2,300분 → ~1,740분)
+#   실측: CGV는 58%가 자정 정각 노출(예약 게시), 롯데·메가는 11~12시 피크 후 저녁까지 산발.
+#   새벽 0~9시엔 신규 게시 없음 → 새벽 크롤 제거, 낮~저녁에 경량 크롤 집중.
+on:
+  schedule:
+    # 경량(특전+재고, --skip-general): KST 12:30 / 15:30 / 18:30 / 21:30
+    - cron: "30 3,6,9,12 * * *"
+    # 풀 크롤 (일반 이벤트 포함): KST 9:30 — CGV 자정 노출분 + 오전 정리
+    - cron: "30 0 * * *"
+  workflow_dispatch: {} # 수동 실행(refresh) — 풀 크롤로 동작
+
+# 실행 겹침 방지: 이전 실행이 끝나지 않았으면 새 실행은 대기
+concurrency:
+  group: crawl
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25 # 멈춘 실행이 예산 잡아먹지 않도록 (풀 크롤 ~15분 + 여유)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install curl-impersonate (Linux, CGV Cloudflare 우회)
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sL https://github.com/lexiforest/curl-impersonate/releases/download/v1.5.6/curl-impersonate-v1.5.6.x86_64-linux-gnu.tar.gz \
+            | tar -xz -C "$HOME/.local/bin" curl-impersonate
+          chmod +x "$HOME/.local/bin/curl-impersonate"
+          "$HOME/.local/bin/curl-impersonate" --version | head -1
+
+      - name: Run crawl pipeline
+        # 낮·저녁 경량 크론은 특전+재고만(--skip-general), 아침 크론·수동 실행은 풀 크롤
+        run: pnpm crawl ${{ github.event.schedule == '30 3,6,9,12 * * *' && '-- --skip-general' || '' }}
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          TMDB_ACCESS_TOKEN: ${{ secrets.TMDB_ACCESS_TOKEN }}
+          KOBIS_API_KEY: ${{ secrets.KOBIS_API_KEY }}
+          # ubuntu-latest 러너의 홈은 /home/runner (api.ts 기본값과 동일하지만 명시)
+          CURL_IMPERSONATE_BIN: /home/runner/.local/bin/curl-impersonate

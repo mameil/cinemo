@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  /* 앱 액센트 */
+  --color-app: #0f766e;
+  --color-app-tint: #e2f1ef;
+
+  /* 체인 아이덴티티 */
+  --color-cgv: #e4002b;
+  --color-lotte: #ed6c00;
+  --color-mega: #6d2e9e;
+
+  /* 좌석/상태 시맨틱 */
+  --color-ok: #15803d;
+  --color-low: #c2620a;
+  --color-soldout: #c81e2b;
+
+  /* 특전 시맨틱 — 앱 액센트와 같은 청록 계열로 통일 */
+  --color-goodie: #0f766e;
+  --color-goodie-tint: #e2f1ef;
+  --color-goodie-line: #b7dcd6;
+
+  /* 표면 */
+  --color-ground: #eef1f5;
+  --color-panel: #ffffff;
+  --color-line: #e2e6ec;
+  --color-line-soft: #eef1f5;
+
+  /* 텍스트 */
+  --color-ink: #191d24;
+  --color-ink-2: #4a515c;
+  --color-ink-3: #858d99;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Pretendard", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #d3d8df transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #d3d8df;
+  border-radius: 3px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}

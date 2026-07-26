@@ -1,0 +1,377 @@
+openapi: 3.1.0
+info:
+  title: cinemo API
+  description: 영화관별 특전(굿즈) 정보 및 소진 현황 조회 API
+  version: 0.1.0
+
+servers:
+  - url: /api
+    description: Next.js API Routes
+
+paths:
+  # ── 캘린더 ──────────────────────────────────────
+  /calendar:
+    get:
+      summary: 캘린더 뷰 (주간/일별 특전 요약)
+      description: 지정된 기간 내 날짜별로 어떤 영화에 어떤 특전이 있는지 요약 반환
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-07-07"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-07-13"
+      responses:
+        "200":
+          description: 날짜별 특전 요약 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        events:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              eventId:
+                                type: integer
+                              eventName:
+                                type: string
+                              chain:
+                                type: string
+                                enum: [CGV, LOTTE, MEGA, INDIE]
+                              movie:
+                                type: object
+                                properties:
+                                  movieId:
+                                    type: integer
+                                  title:
+                                    type: string
+                                  posterUrl:
+                                    type: string
+                                    nullable: true
+                              goodiesCount:
+                                type: integer
+                              goodiesSummary:
+                                type: array
+                                items:
+                                  type: string
+                                description: "굿즈 타입 요약 (예: ['포스터', 'TTT'])"
+
+  # ── 이벤트 ──────────────────────────────────────
+  /events:
+    get:
+      summary: 특전 이벤트 목록
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: chain
+          in: query
+          schema:
+            type: string
+            enum: [CGV, LOTTE, MEGA, INDIE]
+        - name: movieId
+          in: query
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: 이벤트 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EventSummary"
+
+  /events/{id}:
+    get:
+      summary: 이벤트 상세 + 굿즈 목록
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 이벤트 상세
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+        "404":
+          description: 이벤트를 찾을 수 없음
+
+  # ── 영화 ────────────────────────────────────────
+  /movies:
+    get:
+      summary: 영화 목록
+      parameters:
+        - name: search
+          in: query
+          description: 영화 제목 검색
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: 영화 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Movie"
+
+  /movies/{id}:
+    get:
+      summary: 영화 상세 + 관련 이벤트
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 영화 상세 + 진행 중인 이벤트 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  movie:
+                    $ref: "#/components/schemas/Movie"
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EventSummary"
+        "404":
+          description: 영화를 찾을 수 없음
+
+  # ── 굿즈 소진 현황 ─────────────────────────────
+  /goods-stock/{goodieId}:
+    get:
+      summary: 굿즈 지점별 소진 현황
+      parameters:
+        - name: goodieId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: region
+          in: query
+          description: 지역 필터
+          schema:
+            type: string
+          example: "서울"
+      responses:
+        "200":
+          description: 지점별 소진 현황
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  goodie:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      type:
+                        type: string
+                      imageUrl:
+                        type: string
+                        nullable: true
+                  stock:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StockItem"
+        "404":
+          description: 굿즈를 찾을 수 없음
+
+# ── 공통 스키마 ────────────────────────────────────
+components:
+  schemas:
+    Movie:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        posterUrl:
+          type: string
+          nullable: true
+        releaseDate:
+          type: string
+          format: date
+          nullable: true
+
+    EventSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventName:
+          type: string
+        chain:
+          type: string
+          enum: [CGV, LOTTE, MEGA, INDIE]
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        imageUrl:
+          type: string
+          nullable: true
+        movie:
+          $ref: "#/components/schemas/Movie"
+        goodiesCount:
+          type: integer
+
+    EventDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventName:
+          type: string
+        chain:
+          type: string
+          enum: [CGV, LOTTE, MEGA, INDIE]
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        sourceUrl:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        movie:
+          $ref: "#/components/schemas/Movie"
+        goodies:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              type:
+                type: string
+                enum: [포스터, TTT, OT, 기타]
+              imageUrl:
+                type: string
+                nullable: true
+              stockSummary:
+                type: object
+                description: 소진 현황 요약
+                properties:
+                  available:
+                    type: integer
+                    description: 보유 지점 수
+                  low:
+                    type: integer
+                    description: 소량보유 지점 수
+                  soldOut:
+                    type: integer
+                    description: 소진 지점 수
+
+    StockItem:
+      type: object
+      properties:
+        theaterId:
+          type: integer
+        chain:
+          type: string
+        branchName:
+          type: string
+        region:
+          type: string
+        status:
+          type: string
+          enum: [보유, 소량보유, 소진]
+        remainingQty:
+          type: integer
+          nullable: true
+          description: CGV만 제공
+        totalQty:
+          type: integer
+          nullable: true
+          description: CGV만 제공
+        updatedAt:
+          type: string
+          format: date-time
