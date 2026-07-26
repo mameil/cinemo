@@ -38,6 +38,11 @@ export interface InstaCollectOptions {
    * 아카이브는 동명 영화 판별(감독/연도 역참조)의 1차 소스가 된다.
    */
   seed?: boolean;
+  /**
+   * 대상 계정 핸들 제한 (미지정 시 enabled 전체).
+   * 계정별 시드용 — 12계정 일괄 시드는 Apify run-sync 300초 한도를 초과한다.
+   */
+  only?: string[];
 }
 
 interface ApifyPost {
@@ -147,9 +152,12 @@ export async function collectInsta(opts: InstaCollectOptions = {}): Promise<Inst
   // 과금 방어: 게시물 수 하드캡(일상 100 / 시드 200) + Apify 크레딧 사전 점검 (80% 초과 시 중단)
   const limit = Math.min(opts.maxPosts ?? 5, opts.seed ? 200 : 100);
   await assertApifyBudget();
-  const accounts = INSTA_ACCOUNTS.filter((a) => a.enabled);
+  const onlySet = opts.only?.length ? new Set(opts.only.map((h) => h.toLowerCase())) : null;
+  const accounts = INSTA_ACCOUNTS.filter(
+    (a) => a.enabled && (!onlySet || onlySet.has(a.handle.toLowerCase()))
+  );
   if (!accounts.length) {
-    console.log("  활성화된 인스타 계정 없음");
+    console.log("  활성화된 인스타 계정 없음" + (onlySet ? " (--only 매치 없음)" : ""));
     return { events: [], screenings: [] };
   }
   const byHandle = new Map(accounts.map((a) => [a.handle.toLowerCase(), a]));

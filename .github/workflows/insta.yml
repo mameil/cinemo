@@ -37,7 +37,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run instagram crawl
-        run: pnpm --filter @cinemo/crawler insta
+        # --max=2: Apify 무료 $5/월 예산 방어 (12계정 × 2 × 매일 ≈ $1.7/월).
+        # 2026-08-22 사이클 리셋 후 3으로 상향 검토 (놓침 위험 vs 예산).
+        run: pnpm --filter @cinemo/crawler insta -- --max=2
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}

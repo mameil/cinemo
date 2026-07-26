@@ -81,6 +81,8 @@ async function main() {
   const dry = args.includes("--dry");
   const maxArg = args.find((a) => a.startsWith("--max="));
   const maxPosts = maxArg ? Number(maxArg.split("=")[1]) : undefined;
+  const onlyArg = args.find((a) => a.startsWith("--only="));
+  const only = onlyArg ? onlyArg.split("=")[1].split(",").filter(Boolean) : undefined;
 
   if (args.includes("--backfill-timetable")) {
     console.log(`=== 인스타 시간표 백필 ${dry ? "(dry-run)" : ""} ===`);
@@ -91,13 +93,13 @@ async function main() {
   const seed = args.includes("--seed");
   if (seed) {
     console.log(`=== 인스타 시드 아카이브 ${dry ? "(dry-run)" : ""} — 이벤트 미생성 ===`);
-    await collectInsta({ maxPosts: maxPosts ?? 50, dry, seed: true });
+    await collectInsta({ maxPosts: maxPosts ?? 50, dry, seed: true, only });
     console.log("=== 시드 완료 ===");
     return;
   }
 
   console.log(`=== 인스타 수집 시작 ${dry ? "(dry-run: DB 미적재)" : ""} ===`);
-  const { events, screenings } = await collectInsta({ maxPosts, dry });
+  const { events, screenings } = await collectInsta({ maxPosts, dry, only });
 
   if (dry) {
     for (const ev of events) {
