@@ -48,8 +48,9 @@ jobs:
           "$HOME/.local/bin/curl-impersonate" --version | head -1
 
       - name: Run crawl pipeline
-        # 낮·저녁 경량 크론은 특전+재고만(--skip-general), 아침 크론·수동 실행은 풀 크롤
-        run: pnpm crawl ${{ github.event.schedule == '30 3,6,9,12 * * *' && '-- --skip-general' || '' }}
+        # 낮·저녁 경량 크론은 특전+재고만(--skip-general) + 백필 생략(--skip-backfill) — 백필은 아침 풀 크롤 1회.
+        # 2026-07-27: 미매칭 영화(비영화 편성 포함) 70건+ 매 실행 재검색으로 경량 크론이 25분 타임아웃 → 백필 분리
+        run: pnpm crawl ${{ github.event.schedule == '30 3,6,9,12 * * *' && '-- --skip-general --skip-backfill' || '' }}
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
