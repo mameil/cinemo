@@ -45,7 +45,7 @@ export interface InstaCollectOptions {
   only?: string[];
 }
 
-interface ApifyPost {
+export interface ApifyPost {
   id: string;
   shortCode?: string;
   caption?: string;
@@ -78,7 +78,7 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function buildEvent(
+export function buildEvent(
   post: ApifyPost,
   parsed: ParsedGoodiePost,
   account: InstaAccount,
