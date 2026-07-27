@@ -82,23 +82,35 @@ async function backfillTimetables(dry: boolean) {
  * 특전 백필: 시드로만 아카이브돼 이벤트가 안 된 특전 게시물을 승격한다.
  * (시드는 의도적으로 이벤트 미생성 — 계정 활성화 전 공지된 "진행 중" 특전이 묻히는 공백 보완)
  *
- * 승격 기준 (보수적 — 끝난 특전이 '보유'로 뜨는 오염 방지, 설계서 2026-07-26):
- *   특전 분류 + isGoodieEvent + confidence ≥ 0.8 + **종료일이 명시돼 있고 오늘 이후**
+ * 승격 기준 (끝난 특전이 '보유'로 뜨는 오염 방지, 설계서 2026-07-26·27):
+ *   특전 분류 + isGoodieEvent + confidence ≥ 0.8 + 아래 기간 판정 중 하나
+ *   ① 종료일 명시 + 오늘 이후
+ *   ② 종료일 없음 + "N주차" 패턴 → 종료일 = 시작일 + 6일로 간주 후 ①로 판정
+ *      (상상마당 해피엔드처럼 주차별 릴레이 특전은 종료일을 안 적는다 — 2026-07-27 실사례)
+ *   ③ 종료일 없음 + 비주차 → 시작일이 최근 7일 이내(또는 미래)면 진행 중으로 승격
+ *      (기본 종료일 +30일은 buildEvent가 부여 — 데일리 수집과 동일한 동작)
  * 이미지: 시드는 R2 복사를 안 하므로 인스타 CDN 원본에서 재시도 — 서명 만료면 이미지 없이 승격.
  */
+const WEEKLY_GOODIE_PATTERN = /\d+\s*주\s*차/;
+
 async function backfillGoodies(dry: boolean) {
   const today = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const addDays = (d: string, n: number) => {
+    const dt = new Date(d + "T00:00:00Z");
+    dt.setUTCDate(dt.getUTCDate() + n);
+    return dt.toISOString().slice(0, 10);
+  };
   const rows = (await db.all(sql`
     SELECT source_id, raw_json FROM raw_posts
     WHERE source = 'INSTA'
       AND json_extract(raw_json, '$.parsed.category') = '특전'
       AND json_extract(raw_json, '$.parsed.isGoodieEvent') = 1
       AND CAST(json_extract(raw_json, '$.parsed.confidence') AS REAL) >= 0.8
-      AND json_extract(raw_json, '$.parsed.endDate') >= ${today}
       AND NOT EXISTS (SELECT 1 FROM events ev WHERE ev.source_event_id = 'ig-' || raw_posts.source_id)
   `)) as { source_id: string; raw_json: string }[];
 
-  console.log(`  승격 후보 ${rows.length}건 (특전 + 종료일 ${today} 이후 + 이벤트 미존재)`);
+  console.log(`  특전 아카이브(이벤트 미존재) ${rows.length}건 — 기간 판정 시작 (오늘 ${today})`);
   const events: CollectedEvent[] = [];
   for (const row of rows) {
     const { post, parsed } = JSON.parse(row.raw_json) as { post: ApifyPost; parsed: ParsedGoodiePost };
@@ -108,6 +120,18 @@ async function backfillGoodies(dry: boolean) {
     if (!account) {
       console.log(`  ⚠️ 계정 미확인, 건너뜀: ${post.ownerUsername} ${row.source_id}`);
       continue;
+    }
+
+    // 기간 판정 — 주석의 ①②③
+    if (!parsed.endDate && parsed.startDate && WEEKLY_GOODIE_PATTERN.test(parsed.summary ?? "")) {
+      parsed.endDate = addDays(parsed.startDate, 6); // ② 주차 특전 = 그 주만
+    }
+    if (parsed.endDate) {
+      if (parsed.endDate < today) continue; // ① 종료됨
+    } else if (parsed.startDate) {
+      if (parsed.startDate < weekAgo) continue; // ③ 오래된 시작 + 기간 불명 → 보류
+    } else {
+      continue; // 기간 정보 전무 → 판정 불가
     }
 
     // 시드는 R2 복사를 생략했으므로 여기서 복사 — CDN 서명 만료 시 이미지 없이 진행
