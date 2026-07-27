@@ -18,6 +18,12 @@ export const movies = sqliteTable(
     /** KOBIS 영문 제목 — TMDB 한글 미등재 시 재검색용 (예: 일본 애니 총집편) */
     titleEn: text("title_en"),
     releaseDate: text("release_date"),
+    /**
+     * KOBIS/TMDB 매칭을 마지막으로 시도한 시각 (ISO).
+     * 미매칭 영화를 매 실행 재검색하지 않기 위한 마커 — 백필은 이 값이
+     * RECHECK_DAYS(7일)보다 오래됐거나 없는 것만 재시도한다 (2026-07-27 타임아웃 사고).
+     */
+    matchCheckedAt: text("match_checked_at"),
     createdAt: text("created_at")
       .notNull()
       .$defaultFn(() => new Date().toISOString()),

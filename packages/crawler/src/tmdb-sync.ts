@@ -1,6 +1,7 @@
 import { db, movies, resolveMoviePoster } from "@cinemo/shared";
 import { eq, isNull, or } from "drizzle-orm";
 import { fetchMovieInfo } from "./kobis/api";
+import { isNonFilm, shouldAttemptMatch, RECHECK_DAYS } from "./db/backfill-policy";
 
 // 지정한 시간(ms)만큼 대기 (TMDB rate limit 여유용)
 function sleep(ms: number): Promise<void> {
@@ -24,16 +25,27 @@ async function lookupOnly(title: string, year?: number): Promise<void> {
 /** 배치 모드: movies 중 tmdbId 또는 posterUrl 이 비어있는 행을 채운다. */
 export async function syncMovies(): Promise<void> {
   console.log("=== TMDB 포스터 동기화 시작 ===");
-  const pending = await db
+  const all = await db
     .select()
     .from(movies)
     .where(or(isNull(movies.tmdbId), isNull(movies.posterUrl)));
 
-  console.log(`대상 영화 ${pending.length}건\n`);
+  // 재시도 정책 — kobis-backfill과 동일 (같은 실행의 마커는 통과, 주기 재시도)
+  const skipped = all.filter((m) => isNonFilm(m.title) || !shouldAttemptMatch(m.matchCheckedAt));
+  const pending = all.filter((m) => !isNonFilm(m.title) && shouldAttemptMatch(m.matchCheckedAt));
+
+  console.log(
+    `대상 영화 ${pending.length}건 (전체 ${all.length} — 비영화·재시도 대기 ${skipped.length} 제외, 주기 ${RECHECK_DAYS}일)\n`
+  );
 
   let updated = 0;
   let missed = 0;
   for (const movie of pending) {
+    // 시도 마커 — 미매칭이어도 다음 주기까지 재검색하지 않도록 선기록
+    await db
+      .update(movies)
+      .set({ matchCheckedAt: new Date().toISOString() })
+      .where(eq(movies.id, movie.id));
     // 검증: TMDB 원 개봉이 KOBIS 한국 개봉보다 뒤일 수는 없다 (+1년 유예).
     // 동명 영화 오매칭 방지 — 예: 라이카 상영 "부기나이트"(KOBIS 개봉 1999)가
     // 2022년 한국 동명 영화(TMDB)로 붙는 케이스. 고전 재개봉(키키: TMDB 1989 ≤ KOBIS 2007)은 통과.

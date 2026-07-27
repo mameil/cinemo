@@ -7,6 +7,7 @@ import {
 } from "./kobis/api";
 import { normalizeTitle } from "./db/movie-match";
 import { disambiguateKobis } from "./db/movie-disambiguate";
+import { isNonFilm, shouldAttemptMatch, RECHECK_DAYS } from "./db/backfill-policy";
 
 // 지정한 시간(ms)만큼 대기 (KOBIS rate limit 여유용)
 function sleep(ms: number): Promise<void> {
@@ -41,16 +42,30 @@ export async function backfill(dry: boolean): Promise<void> {
   console.log(
     `=== KOBIS 백필 시작${dry ? " (DRY RUN — DB 미변경)" : ""} ===`
   );
-  const pending = await db
+  const all = await db
     .select()
     .from(movies)
     .where(isNull(movies.kobisCode));
 
-  console.log(`대상 영화 ${pending.length}건\n`);
+  // 재시도 정책: 비영화 편성 제외 + 최근 시도한 미매칭은 RECHECK_DAYS 후에만 재시도
+  const nonFilm = all.filter((m) => isNonFilm(m.title));
+  const cooling = all.filter((m) => !isNonFilm(m.title) && !shouldAttemptMatch(m.matchCheckedAt));
+  const pending = all.filter((m) => !isNonFilm(m.title) && shouldAttemptMatch(m.matchCheckedAt));
+
+  console.log(
+    `대상 영화 ${pending.length}건 (미매칭 전체 ${all.length} — 비영화 제외 ${nonFilm.length} · 재시도 대기 ${cooling.length}, 주기 ${RECHECK_DAYS}일)\n`
+  );
 
   let updated = 0;
   let missed = 0;
   for (const movie of pending) {
+    // 시도 마커 — 미매칭이어도 다음 주기까지 재검색하지 않도록 선기록
+    if (!dry) {
+      await db
+        .update(movies)
+        .set({ matchCheckedAt: new Date().toISOString() })
+        .where(eq(movies.id, movie.id));
+    }
     // KOBIS 검색은 문장부호에 민감 ("편-화진담"으로 검색하면 "편 : 화진담"이 안 나옴)
     // → 원제 → 특수문자 제거 → 첫 단어 순으로 점진 축약 재검색.
     //   pickBestMatch가 정규화 완전일치만 통과시키므로 넓은 쿼리도 안전하다.

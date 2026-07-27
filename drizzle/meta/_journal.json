@@ -15,6 +15,13 @@
       "when": 1783668023618,
       "tag": "0001_silky_robbie_robertson",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785154217304,
+      "tag": "0002_cheerful_deathstrike",
+      "breakpoints": true
     }
   ]
 }
