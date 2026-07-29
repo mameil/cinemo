@@ -1,5 +1,5 @@
 /**
- * 상영시간표 수집 오케스트레이터 (롯데 + 메가 + CGV)
+ * 상영시간표 수집 오케스트레이터 (롯데 + 메가 + CGV + 독립영화관)
  *
  * 굿즈 크롤(index.ts)과 분리된 별도 잡. 상영시간표는 무겁고 하루 1회면 충분해서
  * 전용 크론(schedule.yml)에서 실행한다.
@@ -15,6 +15,7 @@ import { appendFileSync } from "fs";
 import { collectLotteScreenings } from "./lotte/schedule";
 import { collectMegaboxScreenings } from "./megabox/schedule";
 import { collectCgvScreenings } from "./cgv/schedule";
+import { collectIndieScreenings } from "./indie/schedule";
 import { ingestScreenings, deletePastScreenings } from "./db/repo";
 import type { Chain, CollectedScreening } from "./domain";
 
@@ -41,6 +42,7 @@ const STAGES: Stage[] = [
   { chain: "LOTTE", label: "롯데 상영", collect: collectLotteScreenings },
   { chain: "MEGA", label: "메가 상영", collect: collectMegaboxScreenings },
   { chain: "CGV", label: "CGV 상영", collect: collectCgvScreenings },
+  { chain: "INDIE", label: "독립관 공식 상영", collect: collectIndieScreenings },
 ];
 
 function writeJobSummary(lines: string[], failed: number): void {
