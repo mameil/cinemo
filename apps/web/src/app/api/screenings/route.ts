@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@cinemo/shared";
+import { db, INDIE_THEATERS } from "@cinemo/shared";
 import { screenings, movies, theaters, events, goodies, goodsStock } from "@cinemo/shared";
 import { eq, and, sql, or, like, not } from "drizzle-orm";
 import type { HomeTimetable, ScreeningCard, MovieMini, GoodieType } from "@mock/types";
@@ -292,6 +292,29 @@ async function handleGet(req: NextRequest) {
       theaterInfoMap.set(r.theaterId, { id: r.theaterId, chain: r.chain, branchName: r.branchName ?? "" });
     }
   }
+
+  // 독립관은 해당 날짜에 회차가 없어도 필터에서 사라지지 않게 v1 전체 카탈로그를 합친다.
+  // 아직 theaters 행이 만들어지지 않은 관은 충돌하지 않는 음수 ID를 사용한다.
+  const indieRows = await db
+    .select({
+      id: theaters.id,
+      branchName: theaters.branchName,
+      chainBranchCode: theaters.chainBranchCode,
+    })
+    .from(theaters)
+    .where(eq(theaters.chain, "INDIE"));
+  const indieByCode = new Map(indieRows.map((t) => [t.chainBranchCode, t]));
+  INDIE_THEATERS.forEach((catalog, index) => {
+    const stored = indieByCode.get(`ig-${catalog.handle}`);
+    const id = stored?.id ?? -(index + 1);
+    if (!theaterInfoMap.has(id)) {
+      theaterInfoMap.set(id, {
+        id,
+        chain: "INDIE",
+        branchName: stored?.branchName ?? catalog.theaterName,
+      });
+    }
+  });
 
   // 지역 그룹핑
   const AREA_RULES: { label: string; keywords: string[] }[] = [

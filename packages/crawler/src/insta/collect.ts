@@ -56,7 +56,7 @@ export interface ApifyPost {
   url?: string;
 }
 
-async function fetchPosts(handles: string[], limit: number): Promise<ApifyPost[]> {
+export async function fetchPosts(handles: string[], limit: number): Promise<ApifyPost[]> {
   const token = process.env.APIFY_TOKEN;
   if (!token) throw new Error("APIFY_TOKEN 환경변수 누락");
   const res = await fetch(

@@ -9,8 +9,8 @@
  *     # 계정 활성화 시 1회: 과거 게시물 아카이브만 (이벤트 미생성 — 동명 영화 판별용)
  */
 
-import { collectInsta, buildEvent, type ApifyPost } from "./collect";
-import { ingest, ingestScreenings } from "../db/repo";
+import { collectInsta, buildEvent, fetchPosts, type ApifyPost } from "./collect";
+import { ingest, ingestScreenings, upsertTheater } from "../db/repo";
 import { parseTimetable, noteToFormat } from "./timetable";
 import type { ParsedGoodiePost } from "./parse";
 import { INSTA_ACCOUNTS } from "./accounts";
@@ -20,33 +20,82 @@ import { db } from "@cinemo/shared";
 import { sql } from "drizzle-orm";
 
 /**
- * 백필: 이미 이벤트로 적재된 극장 게시물의 R2 이미지에서 시간표 재추출.
- * (raw_posts dedup 때문에 일반 수집 경로로는 재처리되지 않는 과거 게시물용)
+ * 백필: raw_posts에 보관된 극장 게시물에서 시간표 재추출.
+ * 이벤트가 있으면 만료되지 않는 R2 이미지를 우선하고, 시드에만 보관돼 이벤트가
+ * 없는 게시물은 raw의 인스타 이미지로 재시도한다.
  */
-async function backfillTimetables(dry: boolean) {
+async function backfillTimetables(dry: boolean, only?: string[]) {
   const rows = (await db.all(sql`
-    SELECT source_event_id, event_name, source_url, detail_image_urls
-    FROM events
-    WHERE chain = 'INDIE' AND category = '극장' AND detail_image_urls IS NOT NULL
-  `)) as { source_event_id: string; event_name: string; source_url: string | null; detail_image_urls: string }[];
+    SELECT
+      rp.source_id,
+      rp.raw_json,
+      ev.source_url,
+      ev.detail_image_urls
+    FROM raw_posts rp
+    LEFT JOIN events ev
+      ON ev.chain = 'INDIE' AND ev.source_event_id = 'ig-' || rp.source_id
+    WHERE rp.source = 'INSTA'
+      AND json_extract(rp.raw_json, '$.parsed.category') = '극장'
+    ORDER BY json_extract(rp.raw_json, '$.post.timestamp') DESC
+  `)) as {
+    source_id: string;
+    raw_json: string;
+    source_url: string | null;
+    detail_image_urls: string | null;
+  }[];
 
-  console.log(`  극장 게시물 ${rows.length}건 검사`);
+  const onlySet = only?.length ? new Set(only.map((handle) => handle.toLowerCase())) : null;
+  console.log(`  극장 게시물 ${rows.length}건 검사${onlySet ? ` (--only ${[...onlySet].join(",")})` : ""}`);
+  // 시드 게시물의 인스타 CDN URL은 만료될 수 있다. 대상 계정을 지정한 복구 실행은
+  // 최근 게시물을 다시 받아 동일 ID의 신선한 이미지 URL을 우선 사용한다.
+  const freshById = new Map<string, ApifyPost>();
+  if (onlySet) {
+    const fresh = await fetchPosts([...onlySet], 10);
+    for (const post of fresh) {
+      if (post.id) freshById.set(post.id, post);
+    }
+    console.log(`  최신 게시물 ${freshById.size}건 이미지 URL 갱신`);
+  }
   const all: CollectedScreening[] = [];
   for (const row of rows) {
-    // 이벤트명 "[라이카시네마] …" 접두로 계정 역추적
-    const account = INSTA_ACCOUNTS.find((a) => row.event_name.startsWith(`[${a.theaterName}]`));
+    const raw = JSON.parse(row.raw_json) as { post: ApifyPost; parsed: ParsedGoodiePost };
+    const account = INSTA_ACCOUNTS.find(
+      (a) => a.handle.toLowerCase() === (raw.post.ownerUsername ?? "").toLowerCase()
+    );
     if (!account) {
-      console.log(`  ⚠️ 계정 미확인, 건너뜀: ${row.event_name}`);
+      console.log(`  ⚠️ 계정 미확인, 건너뜀: ${raw.post.ownerUsername ?? row.source_id}`);
       continue;
     }
-    const images = JSON.parse(row.detail_image_urls) as string[];
+    if (onlySet && !onlySet.has(account.handle.toLowerCase())) continue;
+
+    const r2Images = row.detail_image_urls
+      ? (JSON.parse(row.detail_image_urls) as string[])
+      : [];
+    const freshPost = freshById.get(row.source_id);
+    const sourcePost = freshPost ?? raw.post;
+    const rawImages = sourcePost.images?.length
+      ? sourcePost.images
+      : sourcePost.displayUrl
+        ? [sourcePost.displayUrl]
+        : [];
+    const images = r2Images.length ? r2Images : rawImages;
+    if (!images.length) {
+      console.log(`  ⚠️ 이미지 없음, 건너뜀: ${account.theaterName} ${row.source_id}`);
+      continue;
+    }
+
     try {
-      const tt = await parseTimetable({ imageUrls: images, caption: row.event_name });
+      const tt = await parseTimetable({
+        imageUrls: images,
+        caption: raw.post.caption ?? raw.parsed.summary ?? "",
+      });
       if (!tt.isTimetable || tt.confidence < 0.7) {
-        console.log(`  — 시간표 아님/저신뢰: ${row.event_name}`);
+        console.log(`  — 시간표 아님/저신뢰: [${account.theaterName}] ${raw.parsed.summary}`);
         continue;
       }
-      console.log(`  🎞️ ${row.event_name} → ${tt.screenings.length}회차 (conf ${tt.confidence})`);
+      console.log(
+        `  🎞️ [${account.theaterName}] ${raw.parsed.summary} → ${tt.screenings.length}회차 (conf ${tt.confidence})`
+      );
       all.push(
         ...tt.screenings.map((s) => ({
           chain: "INDIE" as const,
@@ -58,11 +107,14 @@ async function backfillTimetables(dry: boolean) {
           startTime: s.time,
           screenName: "상영관",
           format: noteToFormat(s.note),
-          bookingUrl: row.source_url ?? undefined,
+          bookingUrl:
+            row.source_url ??
+            raw.post.url ??
+            (raw.post.shortCode ? `https://www.instagram.com/p/${raw.post.shortCode}/` : undefined),
         }))
       );
     } catch (err) {
-      console.error(`  ⚠️ 추출 실패 [${row.source_event_id}]: ${(err as Error).message.slice(0, 100)}`);
+      console.error(`  ⚠️ 추출 실패 [${row.source_id}]: ${(err as Error).message.slice(0, 100)}`);
     }
   }
 
@@ -176,9 +228,21 @@ async function main() {
   const onlyArg = args.find((a) => a.startsWith("--only="));
   const only = onlyArg ? onlyArg.split("=")[1].split(",").filter(Boolean) : undefined;
 
+  // 게시물·특전·상영 회차가 아직 없는 관도 웹 필터에서 안정적인 ID로 표시되도록
+  // 매 실행 시 v1 대상 12관을 먼저 등록한다.
+  if (!dry) {
+    for (const account of INSTA_ACCOUNTS.filter((a) => a.enabled)) {
+      await upsertTheater("INDIE", {
+        branchCode: `ig-${account.handle}`,
+        branchName: account.theaterName,
+        region: account.region,
+      });
+    }
+  }
+
   if (args.includes("--backfill-timetable")) {
     console.log(`=== 인스타 시간표 백필 ${dry ? "(dry-run)" : ""} ===`);
-    await backfillTimetables(dry);
+    await backfillTimetables(dry, only);
     return;
   }
 
