@@ -7,6 +7,7 @@
 
 import type { CollectedScreening } from "../domain";
 import { collectCinecubeScreenings } from "./cinecube";
+import { collectEmuScreenings } from "./emu";
 
 interface IndieSource {
   label: string;
@@ -15,6 +16,7 @@ interface IndieSource {
 
 const SOURCES: IndieSource[] = [
   { label: "씨네큐브", collect: collectCinecubeScreenings },
+  { label: "에무시네마", collect: collectEmuScreenings },
 ];
 
 export async function collectIndieScreenings(options: {

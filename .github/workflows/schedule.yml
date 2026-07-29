@@ -50,6 +50,7 @@ jobs:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           TMDB_ACCESS_TOKEN: ${{ secrets.TMDB_ACCESS_TOKEN }}
           KOBIS_API_KEY: ${{ secrets.KOBIS_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           CURL_IMPERSONATE_BIN: /home/runner/.local/bin/curl-impersonate
           # 수집 구역: 지정 안 하면 schedule-all.ts의 기본 구역(일산/서울 서부).
           # 수도권 전체로 넓히려면 secrets/vars로 조정하거나 --all 사용 (무료 예산 주의).
