@@ -6,8 +6,14 @@
  */
 
 import type { CollectedScreening } from "../domain";
+import { collectArirangScreenings } from "./arirang";
 import { collectCinecubeScreenings } from "./cinecube";
+import { collectDeosupScreenings } from "./deosup";
 import { collectEmuScreenings } from "./emu";
+import { collectFilmforumScreenings } from "./filmforum";
+import { collectIndiespaceScreenings } from "./indiespace";
+import { collectMomoScreenings } from "./momo";
+import { collectSeoulArtCinemaScreenings } from "./seoulartcinema";
 
 interface IndieSource {
   label: string;
@@ -15,8 +21,14 @@ interface IndieSource {
 }
 
 const SOURCES: IndieSource[] = [
+  { label: "아리랑시네센터", collect: collectArirangScreenings },
   { label: "씨네큐브", collect: collectCinecubeScreenings },
+  { label: "더숲 아트시네마", collect: collectDeosupScreenings },
   { label: "에무시네마", collect: collectEmuScreenings },
+  { label: "필름포럼", collect: collectFilmforumScreenings },
+  { label: "인디스페이스", collect: collectIndiespaceScreenings },
+  { label: "아트하우스 모모", collect: collectMomoScreenings },
+  { label: "서울아트시네마", collect: collectSeoulArtCinemaScreenings },
 ];
 
 export async function collectIndieScreenings(options: {
