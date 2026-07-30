@@ -26,7 +26,12 @@ import type {
   ScreeningStats,
 } from "../domain";
 import { lt, and, eq } from "drizzle-orm";
-import { classifyGoodieType, findOrCreateMovie, findMovieOnly } from "./movie-match";
+import {
+  classifyGoodieType,
+  findOrCreateMovie,
+  findMovieOnly,
+  normalizeTitle,
+} from "./movie-match";
 
 /** 원본 응답을 raw_posts에 보관 (감사/재파싱용, append-only) */
 export async function saveRaw(
@@ -268,6 +273,11 @@ export async function upsertScreening(
   movieId: number | null
 ): Promise<void> {
   const now = new Date().toISOString();
+  // SQLite UNIQUE에서 NULL은 서로 다른 값으로 취급된다. 독립관처럼 원본 영화코드가
+  // 없는 소스가 매 크론마다 같은 회차를 새 행으로 넣지 않도록 안정적인 대체 키를 쓴다.
+  const sourceMovieCode =
+    screening.sourceMovieCode ??
+    (movieId != null ? `movie:${movieId}` : `title:${normalizeTitle(screening.movieTitle)}`);
   await db
     .insert(screenings)
     .values({
@@ -280,7 +290,7 @@ export async function upsertScreening(
       screenName: screening.screenName ?? null,
       format: screening.format ?? null,
       subtitleDub: screening.subtitleDub ?? null,
-      sourceMovieCode: screening.sourceMovieCode ?? null,
+      sourceMovieCode,
       remainingSeats: screening.remainingSeats ?? null,
       totalSeats: screening.totalSeats ?? null,
       bookingUrl: screening.bookingUrl ?? null,
