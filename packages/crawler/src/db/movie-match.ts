@@ -38,6 +38,40 @@ async function loadCache(): Promise<Map<string, number>> {
   return cache;
 }
 
+function hangulParts(char: string): [number, number, number] | null {
+  const code = char.charCodeAt(0) - 0xac00;
+  if (code < 0 || code > 11171) return null;
+  return [Math.floor(code / 588), Math.floor((code % 588) / 28), code % 28];
+}
+
+/**
+ * OCR이 한글 받침만 잘못 읽은 제목인지 보수적으로 판정한다.
+ * - 한 글자 차이는 4자 이상 제목만 허용
+ * - `춤춤춤 → 충충충` 같은 반복어는 모든 글자의 받침 오독도 허용
+ * - 초성/중성이 다르거나 후보가 둘 이상이면 교정하지 않는다
+ */
+export function isConservativeHangulOcrMatch(rawKey: string, knownKey: string): boolean {
+  if (rawKey.length < 3 || rawKey.length !== knownKey.length) return false;
+  if (!/^[가-힣]+$/.test(rawKey) || !/^[가-힣]+$/.test(knownKey)) return false;
+
+  let differences = 0;
+  for (let i = 0; i < rawKey.length; i++) {
+    if (rawKey[i] === knownKey[i]) continue;
+    const raw = hangulParts(rawKey[i]);
+    const known = hangulParts(knownKey[i]);
+    if (!raw || !known || raw[0] !== known[0] || raw[1] !== known[1] || raw[2] === known[2]) {
+      return false;
+    }
+    differences++;
+  }
+  if (!differences) return false;
+  if (differences === 1 && rawKey.length >= 4) return true;
+
+  const rawRepeated = [...rawKey].every((char) => char === rawKey[0]);
+  const knownRepeated = [...knownKey].every((char) => char === knownKey[0]);
+  return rawRepeated && knownRepeated;
+}
+
 /**
  * 제목으로 영화를 찾거나 없으면 생성한다.
  * @returns movieId, 정규화 결과가 비면(제목 추출 실패) null
@@ -51,6 +85,15 @@ export async function findOrCreateMovie(
   const c = await loadCache();
   const hit = c.get(key);
   if (hit !== undefined) return hit;
+
+  const ocrCandidates = [...c.entries()].filter(([knownKey]) =>
+    isConservativeHangulOcrMatch(key, knownKey)
+  );
+  if (ocrCandidates.length === 1) {
+    const [knownKey, movieId] = ocrCandidates[0];
+    console.log(`  ↻ OCR 제목 교정: "${rawTitle.trim()}" → "${knownKey}"`);
+    return movieId;
+  }
 
   const [row] = await db
     .insert(movies)
