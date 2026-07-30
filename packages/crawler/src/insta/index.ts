@@ -9,7 +9,7 @@
  *     # 계정 활성화 시 1회: 과거 게시물 아카이브만 (이벤트 미생성 — 동명 영화 판별용)
  */
 
-import { collectInsta, buildEvent, fetchPosts, type ApifyPost } from "./collect";
+import { collectInsta, buildEvents, fetchPosts, type ApifyPost } from "./collect";
 import { ingest, ingestScreenings, upsertTheater } from "../db/repo";
 import { parseTimetable, noteToFormat } from "./timetable";
 import type { ParsedGoodiePost } from "./parse";
@@ -159,7 +159,11 @@ async function backfillGoodies(dry: boolean) {
       AND json_extract(raw_json, '$.parsed.category') = '특전'
       AND json_extract(raw_json, '$.parsed.isGoodieEvent') = 1
       AND CAST(json_extract(raw_json, '$.parsed.confidence') AS REAL) >= 0.8
-      AND NOT EXISTS (SELECT 1 FROM events ev WHERE ev.source_event_id = 'ig-' || raw_posts.source_id)
+      AND NOT EXISTS (
+        SELECT 1 FROM events ev
+        WHERE ev.source_event_id = 'ig-' || raw_posts.source_id
+           OR ev.source_event_id LIKE 'ig-' || raw_posts.source_id || '-movie-%'
+      )
   `)) as { source_id: string; raw_json: string }[];
 
   console.log(`  특전 아카이브(이벤트 미존재) ${rows.length}건 — 기간 판정 시작 (오늘 ${today})`);
@@ -183,14 +187,23 @@ async function backfillGoodies(dry: boolean) {
     } else if (parsed.startDate) {
       if (parsed.startDate < weekAgo) continue; // ③ 오래된 시작 + 기간 불명 → 보류
     } else {
-      continue; // 기간 정보 전무 → 판정 불가
+      const postDate = (post.timestamp ?? "").slice(0, 10);
+      const monthAgo = addDays(today, -30);
+      // "~소진 시까지" 공지는 명시 종료일이 없어도 최근 게시물이라면 진행 중으로 본다.
+      if (/소진\s*시/i.test(`${post.caption ?? ""} ${parsed.conditions ?? ""}`) &&
+          postDate >= monthAgo && postDate <= today) {
+        parsed.startDate = postDate;
+      } else {
+        continue; // 기간 정보 전무 → 판정 불가
+      }
     }
 
     // 시드는 R2 복사를 생략했으므로 여기서 복사 — CDN 서명 만료 시 이미지 없이 진행
     const cdnImages = post.images?.length ? post.images : post.displayUrl ? [post.displayUrl] : [];
     const r2Urls: string[] = [];
     if (!dry) {
-      for (let i = 0; i < Math.min(cdnImages.length, 3); i++) {
+      const imageLimit = !parsed.movieTitle && parsed.goodies.length > 1 ? 10 : 3;
+      for (let i = 0; i < Math.min(cdnImages.length, imageLimit); i++) {
         try {
           r2Urls.push(await copyImageToR2(cdnImages[i], `insta/${account.handle}/${post.id}_${i}.jpg`));
         } catch {
@@ -199,11 +212,11 @@ async function backfillGoodies(dry: boolean) {
       }
     }
 
-    const ev = buildEvent(post, parsed, account, r2Urls, true);
-    events.push(ev);
+    const built = buildEvents(post, parsed, account, r2Urls, true);
+    events.push(...built);
     console.log(
       `  ${dry ? "[dry] " : ""}승격: ${account.theaterName} | ${parsed.summary} | ~${parsed.endDate}` +
-        ` | 굿즈 ${parsed.goodies.length} | 이미지 ${r2Urls.length}/${cdnImages.length}`
+        ` | 이벤트 ${built.length} · 굿즈 ${parsed.goodies.length} | 이미지 ${r2Urls.length}/${cdnImages.length}`
     );
   }
 

@@ -54,6 +54,18 @@ export async function syncMovies(): Promise<void> {
       !openYear || !r.releaseDate || Number(r.releaseDate.slice(0, 4)) <= openYear + 1;
 
     let result = await resolveMoviePoster(movie.title);
+    // 기획전 편성명에는 원 영화명 뒤에 부/회차·토크 정보가 붙는다.
+    // TMDB에는 원 제목만 있으므로 안전하게 제거한 별칭으로 한 번 더 찾는다.
+    if (!result) {
+      const baseTitle = movie.title
+        .replace(/\s+\d+\s*[~～-]\s*\d+\s*부(?:\s*\+.*)?$/u, "")
+        .replace(/\s+\d+\s*부(?:\s*\+.*)?$/u, "")
+        .trim();
+      if (baseTitle && baseTitle !== movie.title) {
+        result = await resolveMoviePoster(baseTitle);
+        if (result) console.log(`  ↻ [${movie.id}] 편성명 → 원 제목 "${baseTitle}"로 매칭`);
+      }
+    }
     if (result && !plausible(result)) {
       console.log(
         `  ⚠ [${movie.id}] "${movie.title}" — TMDB 후보(${result.releaseDate})가 한국 개봉(${movie.releaseDate})보다 늦음, 기각 → 영문명 재시도`

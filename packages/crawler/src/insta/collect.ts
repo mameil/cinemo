@@ -120,6 +120,47 @@ export function buildEvent(
   };
 }
 
+/**
+ * 한 게시물에 여러 영화의 특전이 함께 안내되면 영화별 이벤트로 분리한다.
+ * events.movie_id가 단일 값인 현재 스키마에서도 각 상영작에 특전 배지가 붙도록 한다.
+ */
+export function buildEvents(
+  post: ApifyPost,
+  parsed: ParsedGoodiePost,
+  account: InstaAccount,
+  r2Urls: string[],
+  withGoodies: boolean
+): CollectedEvent[] {
+  if (!withGoodies || parsed.movieTitle || parsed.goodies.length < 2) {
+    return [buildEvent(post, parsed, account, r2Urls, withGoodies)];
+  }
+
+  const split = parsed.goodies.flatMap((goodie, index) => {
+    const suffix = goodie.type?.trim() || "포스터|엽서|스티커|티켓북|뱃지|기타";
+    const movieTitle = goodie.name
+      .replace(new RegExp(`\\s+(?:A\\d\\s*)?(?:${suffix})\\s*$`, "i"), "")
+      .trim();
+    if (!movieTitle || movieTitle === goodie.name.trim()) return [];
+    const event = buildEvent(
+      post,
+      { ...parsed, movieTitle, goodies: [goodie] },
+      account,
+      r2Urls,
+      true
+    );
+    const posterImage = r2Urls[index + 1];
+    if (posterImage) {
+      event.imageUrl = posterImage;
+      event.detailImageUrls = [posterImage];
+      event.goodies[0].imageUrl = posterImage;
+    }
+    event.sourceEventId = `ig-${post.id}-movie-${index}`;
+    event.eventName = `[${account.theaterName}] ${movieTitle} ${goodie.type} 증정`;
+    return [event];
+  });
+  return split.length >= 2 ? split : [buildEvent(post, parsed, account, r2Urls, withGoodies)];
+}
+
 /** 시간표 게시물 → CollectedScreening[] (극장 분류 게시물만 2차 호출) */
 async function extractScreenings(
   post: ApifyPost,
@@ -233,7 +274,7 @@ export async function collectInsta(opts: InstaCollectOptions = {}): Promise<Inst
         `  [dry] ${account.theaterName} → [${withGoodies ? "특전" : parsed.category}] ${parsed.summary}` +
           ` (conf ${parsed.confidence})${parsed.goodies.length ? " 굿즈: " + parsed.goodies.map((g) => g.name).join(",") : ""}`
       );
-      result.push(buildEvent(post, parsed, account, cdnImages, withGoodies));
+      result.push(...buildEvents(post, parsed, account, cdnImages, withGoodies));
       allScreenings.push(...postScreenings);
       continue;
     }
@@ -243,7 +284,8 @@ export async function collectInsta(opts: InstaCollectOptions = {}): Promise<Inst
 
     // ④ 이미지 R2 복사 (전 게시물 — 피드 노출용)
     const r2Urls: string[] = [];
-    for (let i = 0; i < Math.min(cdnImages.length, 3); i++) {
+    const imageLimit = withGoodies && !parsed.movieTitle && parsed.goodies.length > 1 ? 10 : 3;
+    for (let i = 0; i < Math.min(cdnImages.length, imageLimit); i++) {
       try {
         r2Urls.push(await copyImageToR2(cdnImages[i], `insta/${account.handle}/${post.id}_${i}.jpg`));
       } catch (err) {
@@ -251,7 +293,7 @@ export async function collectInsta(opts: InstaCollectOptions = {}): Promise<Inst
       }
     }
 
-    result.push(buildEvent(post, parsed, account, r2Urls, withGoodies));
+    result.push(...buildEvents(post, parsed, account, r2Urls, withGoodies));
     allScreenings.push(...postScreenings);
   }
 
