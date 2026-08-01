@@ -8,7 +8,15 @@ on:
   schedule:
     # KST 21:00 (UTC 12:00)
     - cron: "0 12 * * *"
-  workflow_dispatch: {} # 수동 실행
+    # 주 1회 깊은 수집 — 일요일 KST 22:30: pinned 게시물이 데일리 max=2 슬롯을 차지해
+    # 밀려난 신규 게시물을 주 단위로 만회 (08-01 라이카 시간표 미수집 사고)
+    - cron: "30 13 * * 0"
+  workflow_dispatch: # 수동 실행 — 캐치업 시 max를 늘려 pinned 게시물 너머까지 수집
+    inputs:
+      max:
+        description: "계정당 수집 게시물 수 (기본 2 — 캐치업은 10 권장)"
+        required: false
+        default: "2"
 
 concurrency:
   group: insta
@@ -39,7 +47,9 @@ jobs:
       - name: Run instagram crawl
         # --max=2: Apify 무료 $5/월 예산 방어 (12계정 × 2 × 매일 ≈ $1.7/월).
         # 2026-08-22 사이클 리셋 후 3으로 상향 검토 (놓침 위험 vs 예산).
-        run: pnpm --filter @cinemo/crawler insta -- --max=2
+        # ⚠️ 상단 고정(pinned) 게시물이 max 슬롯을 차지해 신규를 밀어낼 수 있다 (08-01 라이카 사고)
+        #    → 주 1회 일요일 밤 --max=10 깊은 수집으로 만회 + 수동 캐치업은 max 입력으로.
+        run: pnpm --filter @cinemo/crawler insta -- --max=${{ github.event.inputs.max || (github.event.schedule == '30 13 * * 0' && '10') || '2' }}
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
