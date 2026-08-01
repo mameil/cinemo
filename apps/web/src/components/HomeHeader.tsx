@@ -6,7 +6,8 @@ import type { Coverage, Chain } from "@mock/types";
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
-function buildDates(count = 6) {
+// 상영 크롤러의 기본 수집 범위(오늘 포함 8일)와 동일하게 노출한다.
+function buildDates(count = 8) {
   const today = new Date();
   return Array.from({ length: count }, (_, i) => {
     const d = new Date(today);
