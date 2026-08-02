@@ -103,6 +103,18 @@ export async function searchMovie(
 }
 
 /**
+ * TMDB 크레딧에서 감독 이름 목록 조회 — 동명·동년 작품 판별용 (KOBIS 감독과 대조).
+ * 크레딧이 없으면 빈 배열 (검증 불가 → 호출측에서 통과 처리).
+ */
+export async function fetchTmdbDirectors(tmdbId: number): Promise<string[]> {
+  const data = await tmdbFetch<{ crew?: { job: string; name: string }[] }>(
+    `/movie/${tmdbId}/credits`,
+    {}
+  );
+  return (data.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name);
+}
+
+/**
  * 해당 영화의 포스터 후보 중 대표 1장 선택.
  * 우선순위: 한국어(ko) → 영어(en) → 언어중립(null) → 나머지.
  * 같은 그룹 내에서는 vote_average → vote_count 순으로 최고 선택.
