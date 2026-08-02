@@ -6,8 +6,10 @@ import type { Coverage, Chain } from "@mock/types";
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
-// 상영 크롤러의 기본 수집 범위(오늘 포함 8일)와 동일하게 노출한다.
-function buildDates(count = 8) {
+// 체인 수집 범위(8일)보다 독립관 인스타 주간 시간표가 더 멀리 나간다
+// (라이카 게시일+11일, 인디스페이스 +12일 실측 — 2026-08-02) → 오늘+10일 노출.
+// 데이터 없는 날짜는 해당 극장 회차가 비어 보일 뿐이라 부작용 없음. 스트립은 가로 스크롤.
+function buildDates(count = 11) {
   const today = new Date();
   return Array.from({ length: count }, (_, i) => {
     const d = new Date(today);
