@@ -207,6 +207,31 @@ async function backfillPosterFallback(): Promise<void> {
     await db.run(sql`UPDATE movies SET poster_url = ${r.img} WHERE id = ${r.id} AND poster_url IS NULL`);
   }
   console.log(`=== 포스터 폴백(극장 공지 이미지): ${targets.length}건 적용 (대상 ${rows.length}건) ===`);
+
+  // 3차 폴백: 합본 상영명("A + B")은 첫 작품의 TMDB 포스터만 빌려온다.
+  // tmdbId는 기록하지 않는다 — 합본 편성 ≠ 단일 작품 (2026-08-02, 어느 뻣뻣한 하루 + 더 치킨).
+  const composites = (await db.all(sql`
+    SELECT id, title FROM movies WHERE poster_url IS NULL AND title LIKE '%+%'
+  `)) as { id: number; title: string }[];
+  let compositeFilled = 0;
+  for (const c of composites) {
+    const first = c.title.split("+")[0].trim();
+    if (first.length < 2) continue;
+    try {
+      const r = await resolveMoviePoster(first);
+      if (r?.posterUrl) {
+        await db.run(sql`UPDATE movies SET poster_url = ${r.posterUrl} WHERE id = ${c.id} AND poster_url IS NULL`);
+        console.log(`  ↻ 합본 "${c.title}" → 첫 작품 "${first}" 포스터 차용`);
+        compositeFilled++;
+      }
+    } catch {
+      // 조회 실패는 다음 실행에서 재시도
+    }
+    await sleep(250);
+  }
+  if (composites.length) {
+    console.log(`=== 합본 포스터 차용: ${compositeFilled}/${composites.length}건 ===`);
+  }
 }
 
 async function main(): Promise<void> {

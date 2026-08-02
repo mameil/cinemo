@@ -17,6 +17,12 @@ interface MovieeRow {
   SUBTITLE?: string;
   SEAT_CNT?: string;
   REMAINSEAT_CNT?: string;
+  THUMB_FILE?: string; // 포스터 썸네일 파일명 — movie-img.moviee.co.kr/DisplayImage?key= 로 서빙
+}
+
+/** MOVIEE 썸네일 파일명 → 이미지 URL (프론트 번들 역추적으로 확인한 패턴, 2026-08-02) */
+function movieeImageUrl(file?: string): string | undefined {
+  return file?.trim() ? `https://movie-img.moviee.co.kr/DisplayImage?key=${file.trim()}` : undefined;
 }
 
 function cleanTitle(value: string): string {
@@ -65,6 +71,7 @@ async function fetchRows(date: string): Promise<CollectedScreening[]> {
       remainingSeats: Number.isFinite(Number(row.REMAINSEAT_CNT)) ? Number(row.REMAINSEAT_CNT) : undefined,
       totalSeats: Number.isFinite(Number(row.SEAT_CNT)) ? Number(row.SEAT_CNT) : undefined,
       bookingUrl: BOOKING_URL,
+      posterUrl: movieeImageUrl(row.THUMB_FILE), // TMDB 미등재작(합본·단편 등) 포스터 폴백
     }];
   });
 }
