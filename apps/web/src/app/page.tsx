@@ -410,6 +410,7 @@ export default function Home() {
           screenings={filtered}
           eventPreviews={data?.eventPreviews}
           goodieStock={data?.goodieStock}
+          onExcludeMovie={handleToggleMovie}
         />
       ) : (
         <TimelineView screenings={filtered} eventPreviews={data?.eventPreviews} />

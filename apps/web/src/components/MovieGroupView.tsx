@@ -111,11 +111,13 @@ function MovieGroupCard({
   eventPreviews,
   goodieStock,
   onPeek,
+  onExcludeMovie,
 }: {
   g: MovieGroup;
   eventPreviews: Record<string, EventPreview[]>;
   goodieStock: Record<string, GoodieStockLite[]>;
   onPeek: (t: PeekTarget) => void;
+  onExcludeMovie?: (id: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const collapsedMax = 3; // 접힌 상태에서 보여줄 극장 수
@@ -153,6 +155,16 @@ function MovieGroupCard({
             <span className="flex-none text-[11px] font-bold text-ink-3 tabular-nums">
               {g.byTheater.length}곳 · {g.screenings.length}회
             </span>
+            {onExcludeMovie && (
+              <button
+                onClick={() => onExcludeMovie(g.movie.id)}
+                title="이 영화 숨기기 — 상단 영화 필터에서 복원"
+                aria-label={`${g.movie.title} 숨기기`}
+                className="flex-none rounded-full border border-line bg-app-tint px-1.5 text-[13px] leading-[20px] text-ink-3 hover:border-app hover:text-app transition-colors"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {/* 특전 요약 (있을 때만) — 클릭 → 전체 미리보기 */}
@@ -319,10 +331,13 @@ export default function MovieGroupView({
   screenings,
   eventPreviews = {},
   goodieStock = {},
+  onExcludeMovie,
 }: {
   screenings: ScreeningCard[];
   eventPreviews?: Record<string, EventPreview[]>;
   goodieStock?: Record<string, GoodieStockLite[]>;
+  /** 카드의 ✕ — 해당 영화를 즉석 제외 (excludedMovies 필터로 연결, 헤더 영화 필터에서 복원) */
+  onExcludeMovie?: (id: number) => void;
 }) {
   const groups = groupByMovie(screenings);
   const [peek, setPeek] = useState<PeekTarget | null>(null);
@@ -330,7 +345,7 @@ export default function MovieGroupView({
   return (
     <div className="flex flex-col gap-2.5 p-3">
       {groups.map((g) => (
-        <MovieGroupCard key={g.movie.id} g={g} eventPreviews={eventPreviews} goodieStock={goodieStock} onPeek={setPeek} />
+        <MovieGroupCard key={g.movie.id} g={g} eventPreviews={eventPreviews} goodieStock={goodieStock} onPeek={setPeek} onExcludeMovie={onExcludeMovie} />
       ))}
       {peek && <EventPeek target={peek} onClose={() => setPeek(null)} />}
     </div>
