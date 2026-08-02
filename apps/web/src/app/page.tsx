@@ -21,6 +21,7 @@ interface HomeTimetableResponse {
     label: string;
     theaterCount: number;
     theaters?: TheaterInfo[];
+    maxDate?: string | null;
   };
   updatedAt: string;
   goodsUpdatedAt: string;

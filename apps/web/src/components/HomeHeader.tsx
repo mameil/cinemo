@@ -6,11 +6,16 @@ import type { Coverage, Chain } from "@mock/types";
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
-// 체인 수집 범위(8일)보다 독립관 인스타 주간 시간표가 더 멀리 나간다
-// (라이카 게시일+11일, 인디스페이스 +12일 실측 — 2026-08-02) → 오늘+10일 노출.
-// 데이터 없는 날짜는 해당 극장 회차가 비어 보일 뿐이라 부작용 없음. 스트립은 가로 스크롤.
-function buildDates(count = 11) {
+// DB에 존재하는 마지막 상영일(coverage.maxDate)까지 날짜 칩을 그린다 — 하드코딩 금지.
+// 폴백 8일(로딩 중·값 없음), 상한 21일(연도 오파싱 등 이상값 방어). 스트립은 가로 스크롤.
+function buildDates(maxDate?: string | null) {
   const today = new Date();
+  let count = 8;
+  if (maxDate && /^\d{4}-\d{2}-\d{2}$/.test(maxDate)) {
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const diff = Math.round((new Date(maxDate + "T00:00:00").getTime() - todayMidnight.getTime()) / 86_400_000) + 1;
+    count = Math.min(Math.max(diff, 1), 21);
+  }
   return Array.from({ length: count }, (_, i) => {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
@@ -45,6 +50,8 @@ interface MovieMini {
 
 interface CoverageWithTheaters extends Coverage {
   theaters?: TheaterInfo[];
+  /** DB에 존재하는 마지막 상영일 (YYYY-MM-DD) — 날짜 스트립 범위 */
+  maxDate?: string | null;
 }
 
 interface Props {
@@ -109,7 +116,7 @@ export default function HomeHeader({
     return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
   }
 
-  const dates = buildDates();
+  const dates = buildDates(coverage.maxDate);
 
   // 지역별 그룹핑
   const theatersByArea = new Map<string, TheaterInfo[]>();

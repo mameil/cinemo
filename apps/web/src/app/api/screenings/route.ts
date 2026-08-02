@@ -334,12 +334,18 @@ async function handleGet(req: NextRequest) {
     .map((t) => ({ ...t, area: t.chain === "INDIE" ? "독립영화관" : getArea(t.branchName) }))
     .sort((a, b) => a.area.localeCompare(b.area) || a.branchName.localeCompare(b.branchName));
 
+  // DB에 존재하는 마지막 상영일 — 홈 날짜 스트립이 하드코딩 대신 이 값까지 그린다
+  const [dateRange] = await db
+    .select({ maxDate: sql<string | null>`MAX(${screenings.playDate})` })
+    .from(screenings);
+
   const result = {
     date,
     coverage: {
       label: "파주 · 일산 · 고양 · 서울 서부",
       theaterCount: theaterInfoMap.size,
       theaters: theaterList,
+      maxDate: dateRange?.maxDate ?? null,
     },
     updatedAt: latestUpdate || new Date().toISOString(),
     goodsUpdatedAt: goodsUpdatedAt || new Date().toISOString(),
