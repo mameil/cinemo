@@ -1,5 +1,5 @@
 import { db, movies, resolveMoviePoster, fetchTmdbDirectors } from "@cinemo/shared";
-import { eq, isNull, or } from "drizzle-orm";
+import { eq, isNull, or, sql } from "drizzle-orm";
 import { fetchMovieInfo } from "./kobis/api";
 import { isNonFilm, shouldAttemptMatch, RECHECK_DAYS } from "./db/backfill-policy";
 
@@ -181,6 +181,32 @@ export async function syncMovies(): Promise<void> {
   }
 
   console.log(`\n=== 완료: ${updated}건 업데이트, ${missed}건 미매칭 ===`);
+  await backfillPosterFallback();
+}
+
+/**
+ * 포스터 폴백: TMDB에 없는 영화는 빈칸 대신 **극장이 올린 공지 이미지**를 노출한다
+ * (2026-08-02 사용자 결정 — 첫 케이스: 최승우 〈지난 여름〉, TMDB 미등재 국내 독립영화).
+ * 우선순위: 영화(개봉 공지 — 대부분 포스터 원본) > 특전 > 상영회 > 기타.
+ * tmdbId가 비어 있는 행은 주기 재시도가 계속되므로, 진짜 포스터가 매칭되면 자동 교체된다.
+ */
+async function backfillPosterFallback(): Promise<void> {
+  const rows = (await db.all(sql`
+    SELECT m.id AS id,
+      (SELECT e.image_url FROM events e
+        WHERE e.movie_id = m.id AND e.image_url IS NOT NULL
+        ORDER BY CASE e.category WHEN '영화' THEN 0 WHEN '특전' THEN 1 WHEN '상영회' THEN 2 ELSE 3 END,
+                 e.id DESC
+        LIMIT 1) AS img
+    FROM movies m
+    WHERE m.poster_url IS NULL
+  `)) as { id: number; img: string | null }[];
+
+  const targets = rows.filter((r) => r.img);
+  for (const r of targets) {
+    await db.run(sql`UPDATE movies SET poster_url = ${r.img} WHERE id = ${r.id} AND poster_url IS NULL`);
+  }
+  console.log(`=== 포스터 폴백(극장 공지 이미지): ${targets.length}건 적용 (대상 ${rows.length}건) ===`);
 }
 
 async function main(): Promise<void> {
