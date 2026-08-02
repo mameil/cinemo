@@ -262,6 +262,7 @@ export interface MegaScheduleItem {
   playKindNm: string; // "2D(자막)" 등
   restSeatCnt: number;
   totSeatCnt: number;
+  moviePosterImg?: string; // 시간표 썸네일 (상대경로) — TMDB 미등재 편성 포스터 폴백용
 }
 
 /** 수도권(서울10/경기30/인천35) 지점 목록 */

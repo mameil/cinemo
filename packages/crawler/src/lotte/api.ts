@@ -210,6 +210,7 @@ export interface LottePlaySeq {
   TranslationDivisionNameKR: string; // 자막 | 더빙
   BookingSeatCount: number; // 예매 가능(잔여) 좌석
   TotalSeatCount: number;
+  PosterURL?: string; // 시간표 썸네일 — TMDB 미등재 편성(콘서트 실황 등) 포스터 폴백용
 }
 
 /**

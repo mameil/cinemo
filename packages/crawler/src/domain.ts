@@ -83,6 +83,8 @@ export interface CollectedScreening {
   remainingSeats?: number;
   totalSeats?: number;
   bookingUrl?: string;
+  /** 체인 시간표가 주는 썸네일 — TMDB 미등재 편성(콘서트 실황 등)의 포스터 폴백용 */
+  posterUrl?: string;
 }
 
 /** 상영 적재 결과 통계 */

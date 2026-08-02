@@ -25,7 +25,7 @@ import type {
   IngestStats,
   ScreeningStats,
 } from "../domain";
-import { lt, and, eq } from "drizzle-orm";
+import { lt, and, eq, sql } from "drizzle-orm";
 import {
   classifyGoodieType,
   findOrCreateMovie,
@@ -350,6 +350,8 @@ export async function ingestScreenings(
   const stats: ScreeningStats = { screenings: 0, theaters: 0, moviesLinked: 0, skipped: 0 };
   // 영화 제목 → movieId 캐시 (동일 영화 반복 조회 방지)
   const movieCache = new Map<string, number | null>();
+  // 이번 배치에서 포스터 폴백을 이미 시도한 영화 (영화당 1회만)
+  const posterTried = new Set<number>();
   let consecutiveFailures = 0;
 
   for (const s of list) {
@@ -363,6 +365,15 @@ export async function ingestScreenings(
         } else {
           movieId = await findOrCreateMovie(s.movieTitle);
           movieCache.set(s.movieTitle, movieId);
+        }
+
+        // 체인 시간표 썸네일로 빈 포스터 채움 — 콘서트 실황 등 TMDB 미등재 편성용.
+        // 이미 포스터가 있으면(정식 TMDB 포스터 포함) 건드리지 않는다.
+        if (movieId && s.posterUrl && !posterTried.has(movieId)) {
+          posterTried.add(movieId);
+          await db.run(
+            sql`UPDATE movies SET poster_url = ${s.posterUrl} WHERE id = ${movieId} AND poster_url IS NULL`
+          );
         }
 
         await upsertScreening(s, theaterId, movieId);

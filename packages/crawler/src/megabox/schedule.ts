@@ -58,6 +58,12 @@ function mapItem(
     subtitleDub: subtitleDub(s.playKindNm),
     remainingSeats: s.restSeatCnt,
     totalSeats: s.totSeatCnt,
+    // 시간표 응답의 포스터 썸네일 (상대경로 → img 호스트 절대화)
+    posterUrl: s.moviePosterImg
+      ? s.moviePosterImg.startsWith("http")
+        ? s.moviePosterImg
+        : `https://img.megabox.co.kr${s.moviePosterImg.startsWith("/") ? "" : "/"}${s.moviePosterImg}`
+      : undefined,
   };
 }
 

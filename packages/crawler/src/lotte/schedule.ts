@@ -107,6 +107,7 @@ export async function collectLotteScreenings(
           subtitleDub: s.TranslationDivisionNameKR || undefined,
           remainingSeats: s.BookingSeatCount,
           totalSeats: s.TotalSeatCount,
+          posterUrl: s.PosterURL || undefined,
         });
       }
       await sleep(delayMs); // rate-limit 회피
