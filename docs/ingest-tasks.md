@@ -98,6 +98,24 @@
 결과: 이미지 매칭 28→30/35 (우산 2건). 잔여 5건(모아나 SX, 미니언즈 XTRA 4종)은
 CGV에 이미지 소스 자체가 없음 — 미제공 표기가 정답인 상태.
 
+## 2026-08-05 — CGV 상품목록 API 폐기 → 하이브리드 재고
+
+- **증상**: 8/3부터 crawl 워크플로우 전부 실패. 로그 `Unexpected token '<' … <!DOCTYPE`
+  = JSON 대신 CGV 에러 페이지(HTTP 403) 수신 → `JSON.parse` throw로 CGV 전체 abort.
+- **원인**: CGV 신규 웹 개편으로 `searchSaprmEvtProdList`(saprmEvntNo→spmtlNo 상품목록)
+  가 **app 레벨 403 폐기**. 프론트 번들에 saprm 굿즈 참조 전무, 레거시 모바일 페이지도
+  신규 홈으로 리다이렉트 = 사은품 소진현황 기능 자체 제거. `searchSaprmEvtProdList`만
+  사망이고 **이벤트 목록(list)·지점별 재고(tgtsiteList)는 생존** — 단 재고 응답 형식이
+  바뀜: 숫자 재고(`rlInvntQty`/`totPayQty`) → 상태 색상 `inventStatus`(green=보유·gray=소진).
+- **대응 (하이브리드)**: spmtlNo 신규 발견 불가 → 3갈래.
+  - ⓐ ProdList 생존 시 종전대로 (미래 대비)
+  - ⓑ DB에 spmtlNo 있는 활성 이벤트 → `getKnownCgvGoods()`로 꺼내 `tgtsiteList`로 재고 유지
+  - ⓒ 신규 이벤트 → 이벤트명=굿즈명 합성, 재고 없이 이름·타입만 (`classifyGoodieType`)
+  - `mapStock`: `inventStatus` green→보유·그 외→소진(보수적). 수량 필드는 비움.
+- **한계**: 8/3 이후 신규 CGV 특전은 재고 없음 → "특전 노출 규칙"의 재고 게이트 통과 불가
+  (이름·타입·기간만). 기존 이벤트 재고는 종료일까지 유지되나 가치는 만료와 함께 소멸.
+- 파일: `cgv/collect.ts`(가드+3갈래+mapStock) · `cgv/api.ts`(CgvStockItem 신형) · `db/repo.ts`(getKnownCgvGoods)
+
 ## 별도 TODO (나중에 결정/작업)
 
 - [ ] **굿즈명이 영화로 오추출되는 케이스 정리** — best-effort 영화명 추출이 굿즈/키링 이름을 영화로 만드는 경우 있음 (예: "민들레마음 인형 키링", "메이플스토리 키캡 키링"). 이런 행은 TMDB/KOBIS 매칭도 실패하므로, "이벤트에 굿즈가 없고 KOBIS/TMDB 매칭도 실패한 movies"를 주기적으로 정리하거나 추출 필터를 강화.

@@ -29,6 +29,7 @@ import {
   type CgvSaprmProduct,
   type CgvStockItem,
 } from "./api";
+import { getKnownCgvGoods } from "../db/repo";
 
 export interface CgvCollectOptions {
   /** 수집할 특전 이벤트 최대 개수 (미지정 시 전체) */
@@ -37,6 +38,12 @@ export interface CgvCollectOptions {
   pageSize?: number;
   /** true면 일반 이벤트 자체 수집 생략 (특전 이미지 매칭용 로드는 유지) — 3h 크론용 */
   skipGeneral?: boolean;
+  /**
+   * saprmEvntNo → 기존 굿즈 {name, spmtlNo}[]. CGV가 2026-08 상품목록 API를
+   * 폐기해 spmtlNo 신규 발견이 불가하므로, 이미 DB에 있는 spmtlNo로 재고만 갱신한다.
+   * 미지정 시 collectCgv가 DB에서 직접 조회 (getKnownCgvGoods).
+   */
+  knownGoods?: Map<string, { name: string; spmtlNo: string }[]>;
 }
 
 /** YYYYMMDD → YYYY-MM-DD */
@@ -47,11 +54,11 @@ function formatYmd(ymd: string): string {
   return ymd;
 }
 
-/** 잔여/총 수량으로 소진 상태 환산 */
-function toStatus(remain: number, total: number): StockStatus {
-  if (remain <= 0) return "소진";
-  if (total > 0 && remain / total <= 0.1) return "소량보유";
-  return "보유";
+/** 신규 재고 상태(inventStatus 색상) → 소진 상태.
+ *  green=보유. 그 외(gray 등)는 보수적으로 소진 처리 — "소진인데 보유로 오노출"이
+ *  "보유인데 소진으로 미노출"보다 사용자에게 더 해롭기 때문. */
+function statusFromInvent(inventStatus: string): StockStatus {
+  return inventStatus === "green" ? "보유" : "소진";
 }
 
 /** 문자열 선두의 [대괄호] 내용을 추출 (잘림 표시 …/... 정리) */
@@ -242,9 +249,8 @@ function mapStock(s: CgvStockItem): CollectedStock {
     branchCode: s.siteNo,
     branchName: s.expoSiteNm || s.siteNm,
     region: s.regnGrpNm,
-    status: toStatus(s.rlInvntQty, s.totPayQty),
-    remainingQty: s.rlInvntQty,
-    totalQty: s.totPayQty,
+    status: statusFromInvent(s.inventStatus),
+    // 신규 응답은 수량을 주지 않음 — remainingQty/totalQty 비움
   };
 }
 
@@ -253,6 +259,10 @@ export async function collectCgv(
   opts: CgvCollectOptions = {}
 ): Promise<CollectedEvent[]> {
   const pageSize = opts.pageSize ?? 50;
+
+  // 기존 spmtlNo 확보 (재고 갱신용) — CGV 상품목록 API 폐기 대응.
+  const knownGoods =
+    opts.knownGoods ?? (await getKnownCgvGoods().catch(() => new Map()));
 
   // 1. 특전 이벤트 목록 (페이징)
   const first = await fetchSaprmEventList(0, pageSize);
@@ -297,18 +307,55 @@ export async function collectCgv(
   let matchCount = 0;
   let titleFallbackCount = 0;
   let umbrellaCount = 0;
+  let prodFailCount = 0; // searchSaprmEvtProdList 실패 건수 (2026-08 CGV app 레벨 403 폐기)
   const generalSiteCache = new Map<string, string[]>(); // evntNo → 진행 극장 siteNo[]
   for (const ev of limited) {
-    const products = await fetchSaprmProducts(ev.saprmEvntNo);
+    // CGV가 2026-08-03 굿즈 상품목록 API(searchSaprmEvtProdList)를 app 레벨 403으로 폐기.
+    // 이제 spmtlNo를 신규 발견할 수 없다. 세 갈래로 처리한다:
+    //   ⓐ ProdList가 (혹시) 살아있으면 종전대로
+    //   ⓑ DB에 spmtlNo가 있는 기존 이벤트 → tgtsiteList(생존)로 재고만 갱신
+    //   ⓒ 그 외(신규 이벤트) → 이벤트명 = 굿즈명으로 합성, 재고 없이 이름/타입만
+    let products: CgvSaprmProduct[] = [];
+    try {
+      products = await fetchSaprmProducts(ev.saprmEvntNo);
+    } catch {
+      prodFailCount++;
+    }
+
+    const stockFor = async (spmtlNo: string): Promise<CollectedStock[]> => {
+      try {
+        return (await fetchStockBySite(ev.saprmEvntNo, spmtlNo)).map(mapStock);
+      } catch {
+        prodFailCount++;
+        return [];
+      }
+    };
 
     const goodies: CollectedGoodie[] = [];
-    for (const p of products) {
-      const stockItems = await fetchStockBySite(ev.saprmEvntNo, p.spmtlNo);
-      goodies.push({
-        name: (p.onlnExpoNm || p.spmtlProdNm || "").trim(),
-        sourceGoodsId: p.spmtlNo,
-        stock: stockItems.map(mapStock),
-      });
+    if (products.length > 0) {
+      // ⓐ 레거시 경로
+      for (const p of products) {
+        goodies.push({
+          name: (p.onlnExpoNm || p.spmtlProdNm || "").trim(),
+          sourceGoodsId: p.spmtlNo,
+          stock: await stockFor(p.spmtlNo),
+        });
+      }
+    } else {
+      const known = knownGoods.get(ev.saprmEvntNo);
+      if (known && known.length > 0) {
+        // ⓑ 기존 spmtlNo로 재고 유지
+        for (const k of known) {
+          goodies.push({
+            name: k.name,
+            sourceGoodsId: k.spmtlNo,
+            stock: await stockFor(k.spmtlNo),
+          });
+        }
+      } else {
+        // ⓒ 신규 이벤트 — 이름/타입만 (재고 소스 없음)
+        goodies.push({ name: ev.saprmEvntNm.trim(), stock: [] });
+      }
     }
 
     // 일반 이벤트 매칭 → 상세 이미지 + 배너 이미지 (실패해도 특전 수집은 계속)
@@ -406,6 +453,15 @@ export async function collectCgv(
   console.log(
     `  이미지 매칭: ${matchCount}/${limited.length} (제목 폴백: ${titleFallbackCount} · 기획전 우산: ${umbrellaCount})`
   );
+  const withStock = result.filter((e) =>
+    e.goodies.some((g) => g.stock.length > 0)
+  ).length;
+  if (prodFailCount > 0) {
+    console.warn(
+      `  ⚠️ CGV 상품목록 API(searchSaprmEvtProdList) 폐기(403) — spmtlNo 신규 발견 불가. ` +
+        `기존 spmtlNo로 재고 유지 ${withStock}건 / 신규는 이름·타입만. (조회 실패 ${prodFailCount}회)`
+    );
+  }
 
   // 3. saprm과 매칭 안 된 일반 이벤트 → 자체 수집 (이벤트 피드용, 목록+배너만 가볍게)
   const CGV_CATEGORY: Record<string, string> = {

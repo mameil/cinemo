@@ -25,13 +25,47 @@ import type {
   IngestStats,
   ScreeningStats,
 } from "../domain";
-import { lt, and, eq, sql } from "drizzle-orm";
+import { lt, gte, and, eq, sql } from "drizzle-orm";
 import {
   classifyGoodieType,
   findOrCreateMovie,
   findMovieOnly,
   normalizeTitle,
 } from "./movie-match";
+
+/**
+ * 이미 적재된 CGV 굿즈의 spmtlNo(source_goods_id)를 이벤트별로 반환.
+ *
+ * CGV가 2026-08 상품목록 API(searchSaprmEvtProdList)를 폐기해 신규 spmtlNo 발견이
+ * 불가하다. 대신 이미 저장된 spmtlNo로 재고(searchSaprmEvtTgtsiteList, 생존)만
+ * 갱신하기 위한 조회. 종료일이 지난 이벤트는 제외(갱신 가치 없음).
+ */
+export async function getKnownCgvGoods(): Promise<
+  Map<string, { name: string; spmtlNo: string }[]>
+> {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = await db
+    .select({
+      ev: events.sourceEventId,
+      name: goodies.name,
+      spmtl: goodies.sourceGoodsId,
+    })
+    .from(goodies)
+    .innerJoin(events, eq(goodies.eventId, events.id))
+    .where(and(eq(events.chain, "CGV"), gte(events.endDate, today)));
+
+  const map = new Map<string, { name: string; spmtlNo: string }[]>();
+  for (const r of rows) {
+    if (!r.ev || !r.spmtl) continue;
+    // 합성 굿즈는 source_goods_id에 name이 들어가므로(자연키 대체) 제외 —
+    // 실제 spmtlNo는 saprmEvntNo(12자리) + 4자리 형식.
+    if (!/^\d{16}$/.test(r.spmtl)) continue;
+    const arr = map.get(r.ev) ?? [];
+    arr.push({ name: r.name, spmtlNo: r.spmtl });
+    map.set(r.ev, arr);
+  }
+  return map;
+}
 
 /** 원본 응답을 raw_posts에 보관 (감사/재파싱용, append-only) */
 export async function saveRaw(

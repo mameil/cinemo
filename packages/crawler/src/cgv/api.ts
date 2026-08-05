@@ -79,8 +79,10 @@ export interface CgvStockItem {
   regnGrpCd: string;
   regnGrpNm: string;
   fcfsPayYn: string;
-  rlInvntQty: number;
-  totPayQty: number;
+  sortOseq?: number;
+  // 2026-08 신규 응답: 숫자 재고(rlInvntQty/totPayQty)가 사라지고 상태 색상만 제공.
+  //   "green" = 보유 · "gray" = 소진/미취급
+  inventStatus: string;
 }
 
 // ── 서명 생성 ───────────────────────────────────
