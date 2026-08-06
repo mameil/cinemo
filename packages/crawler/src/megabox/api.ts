@@ -49,8 +49,11 @@ function fetchHtml(
   method: "GET" | "POST" = "GET",
   body?: object
 ): string {
-  // curl 자체 재시도(--retry) + 넉넉한 타임아웃
-  let cmd = `curl -s --max-time 25 --retry 3 --retry-delay 2 '${url}' -H 'User-Agent: ${USER_AGENT}'`;
+  // curl 자체 재시도(--retry)는 쓰지 않는다: --retry 3 × --max-time 25 = 최악 ~79초가
+  // 한 번의 execSync 안에서 돌아 node timeout(30초)이 /bin/sh를 강제 종료 →
+  // `spawnSync ETIMEDOUT`으로 메가박스 단계가 간헐 실패했다 (2026-08-06).
+  // 재시도는 아래 JS 레벨 루프가 전담 — 한 curl 호출(≤25초)은 node timeout(30초) 안에 든다.
+  let cmd = `curl -s --max-time 25 '${url}' -H 'User-Agent: ${USER_AGENT}'`;
   if (method === "POST" && body) {
     cmd += ` -H 'Content-Type: application/json' -d '${JSON.stringify(body)}'`;
   }
