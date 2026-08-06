@@ -119,9 +119,12 @@ async function fetchJson<T>(url: string): Promise<T> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     const sig = generateSignature(pathname); // 매 시도마다 타임스탬프 갱신
     try {
-      // Cloudflare 우회: curl-impersonate + Chrome 131 TLS 지문 (--retry로 curl 레벨 재시도)
+      // Cloudflare 우회: curl-impersonate + Chrome 131 TLS 지문.
+      // curl 자체 재시도(--retry)는 쓰지 않는다 — --retry × --max-time 25가 쌓이면
+      // node timeout(30초)을 넘겨 spawnSync ETIMEDOUT을 유발한다(메가박스와 동일 이슈, 2026-08-06).
+      // 재시도는 아래 for 루프(3회)가 전담하고, 한 curl 호출(≤25초)은 node timeout 안에 든다.
       const result = execSync(
-        `'${CURL_BIN}' -s --max-time 25 --retry 2 --retry-delay 2 '${url}' ` +
+        `'${CURL_BIN}' -s --max-time 25 '${url}' ` +
           `--ciphers ${CHROME_CIPHERS} ` +
           `--curves ${CHROME_CURVES} ` +
           `-H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' ` +
