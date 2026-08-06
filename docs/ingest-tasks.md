@@ -116,6 +116,25 @@ CGV에 이미지 소스 자체가 없음 — 미제공 표기가 정답인 상�
   (이름·타입·기간만). 기존 이벤트 재고는 종료일까지 유지되나 가치는 만료와 함께 소멸.
 - 파일: `cgv/collect.ts`(가드+3갈래+mapStock) · `cgv/api.ts`(CgvStockItem 신형) · `db/repo.ts`(getKnownCgvGoods)
 
+## 2026-08-06 — CGV 이벤트 API 호스트 이관 (event.cgv.co.kr → cgv.co.kr/api/v1)
+
+- **증상**: 8/5 밤부터 crawl 워크플로우 매 실행 실패 (하루 3~4회 실패 알림). CGV만 죽고
+  롯데·메가는 정상. 로그 `Unexpected token '<' … <!DOCTYPE` — JSON 대신 CGV 차단 페이지.
+- **원인**: CGV가 **구 `event.cgv.co.kr` 호스트를 폐쇄**. 이 호스트의 전 경로(특전 목록·
+  일반 이벤트 목록 포함)가 HTTP 403 "비정상적으로 CGV에 접속한 것이 확인되어 이용이 제한되었어요"
+  차단 페이지 반환. TLS 지문(curl-impersonate 전 타깃)·HTTP/3·쿠키·서명 유무 무관하게 차단
+  = 요청 모양 문제 아닌 **서버측 host-wide 차단**(GitHub Actions 러너도 동일). 반면 상영시간표
+  호스트 `api.cgv.co.kr`는 **같은 HMAC 서명·같은 지문으로 정상** → schedule.yml은 계속 성공.
+- **규명**: 실 브라우저(puppeteer-core + 시스템 Chrome)로 cgv.co.kr SPA 번들을 grep →
+  현행 게이트웨이 **`https://cgv.co.kr/api/v1/content/event`** 확인. 구 경로를 이 베이스로
+  이관하니 5개 엔드포인트(saprm 목록/상품/재고, evt 목록/상세) **전부 200**. 서명 없이도 200이며
+  curl-impersonate만으로 됨(브라우저 불필요). **폐기됐던 `searchSaprmEvtProdList`도 부활** →
+  collect.ts ⓐ 정규 경로 복귀(신규 특전도 상품·재고 확보). 재고는 여전히 `inventStatus` 색상만.
+- **대응**: `cgv/api.ts`의 `EVENT_BASE` 한 줄 교체 (구 호스트 → 신 게이트웨이). 경로·서명·collect
+  로직은 그대로. 하이브리드 3갈래(ⓑ/ⓒ)는 안전망으로 유지 — 향후 ProdList 재폐기 대비.
+- **검증**: `cgv --dry --max=3` → 특전 6건 수집, "지점 8곳 중 8곳 보유"로 상품·재고 체인 정상,
+  폐기 경고 미출력. 파일: `cgv/api.ts`(EVENT_BASE).
+
 ## 별도 TODO (나중에 결정/작업)
 
 - [ ] **굿즈명이 영화로 오추출되는 케이스 정리** — best-effort 영화명 추출이 굿즈/키링 이름을 영화로 만드는 경우 있음 (예: "민들레마음 인형 키링", "메이플스토리 키캡 키링"). 이런 행은 TMDB/KOBIS 매칭도 실패하므로, "이벤트에 굿즈가 없고 KOBIS/TMDB 매칭도 실패한 movies"를 주기적으로 정리하거나 추출 필터를 강화.

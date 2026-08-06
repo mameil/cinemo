@@ -1,19 +1,24 @@
 /**
  * CGV API 클라이언트
  *
- * 엔드포인트 정리:
- * - 이벤트 목록: event.cgv.co.kr/evt/evt/evt/searchEvtListForPage
- * - 이벤트 상세: event.cgv.co.kr/evt/evt/evtDtl/searchEvtDtl
- * - 특전 목록: event.cgv.co.kr/evt/saprm/saprm/searchSaprmEvtListForPage
- * - 특전 상품: event.cgv.co.kr/evt/saprm/saprm/searchSaprmEvtProdList
- * - 소진 현황: event.cgv.co.kr/evt/saprm/saprm/searchSaprmEvtTgtsiteList
+ * 엔드포인트 정리 (경로는 EVENT_BASE 기준 상대):
+ * - 이벤트 목록: /evt/evt/searchEvtListForPage
+ * - 이벤트 상세: /evt/evtDtl/searchEvtDtl
+ * - 특전 목록: /saprm/saprm/searchSaprmEvtListForPage
+ * - 특전 상품: /saprm/saprm/searchSaprmEvtProdList
+ * - 소진 현황: /saprm/saprm/searchSaprmEvtTgtsiteList
+ *
+ * 2026-08-06: CGV가 구 event.cgv.co.kr 호스트를 폐쇄(전 경로 403 "비정상 접속" 차단).
+ *   현행 SPA(cgv.co.kr)가 쓰는 신 게이트웨이 cgv.co.kr/api/v1/content/event 로 이관.
+ *   신 호스트는 x-signature 없이도 200이지만, 서명은 그대로 유지(무해).
+ *   폐기됐던 상품목록(searchSaprmEvtProdList)도 신 호스트에서 부활 → collect.ts ⓐ 경로 복귀.
  */
 
 import { createHmac } from "crypto";
 import { execSync } from "child_process";
 import { homedir } from "os";
 
-const EVENT_BASE = "https://event.cgv.co.kr/evt";
+const EVENT_BASE = "https://cgv.co.kr/api/v1/content/event";
 const CO_CD = "A420";
 const HMAC_KEY = "ydqXY0ocnFLmJGHr_zNzFcpjwAsXq_8JcBNURAkRscg";
 
