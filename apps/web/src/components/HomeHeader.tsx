@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Coverage, Chain } from "@mock/types";
+import BatchStatus from "@/components/BatchStatus";
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -145,16 +146,19 @@ export default function HomeHeader({
             <span className={`text-[10px] transition-transform ${showTheaters ? "rotate-180" : ""}`}>▼</span>
           </button>
         </div>
-        <button
-          onClick={onRefresh}
-          disabled={refreshing}
-          className="ml-auto text-right text-[10.5px] leading-snug text-ink-3 whitespace-nowrap hover:text-app transition-colors disabled:opacity-50"
-        >
-          <span className={refreshing ? "inline-block animate-spin" : ""}>↻</span>
-          {" "}상영 {hhmm(updated)} · {ago(updated)}
-          <br />
-          🎁 굿즈 {hhmm(goodsUpdated)} · {ago(goodsUpdated)}
-        </button>
+        <div className="ml-auto flex flex-col items-end gap-1">
+          <button
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="text-right text-[10.5px] leading-snug text-ink-3 whitespace-nowrap hover:text-app transition-colors disabled:opacity-50"
+          >
+            <span className={refreshing ? "inline-block animate-spin" : ""}>↻</span>
+            {" "}상영 {hhmm(updated)} · {ago(updated)}
+            <br />
+            🎁 굿즈 {hhmm(goodsUpdated)} · {ago(goodsUpdated)}
+          </button>
+          <BatchStatus />
+        </div>
       </div>
 
       {/* 극장 목록 (지역별 그룹 + 체크박스) */}
