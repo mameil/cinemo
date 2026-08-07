@@ -146,6 +146,7 @@ CGV에 이미지 소스 자체가 없음 — 미제공 표기가 정답인 상�
 ## 나중 개선사항 (명시만)
 
 - [ ] **화면에 마지막 refresh 시각 표시** — 배치가 언제 돌았는지 UI에 노출. `MAX(goods_stock.updated_at)`로 도출 가능하거나, 별도 `crawl_runs`(또는 메타) 테이블 추가 고려.
+  - ✅ **`crawl_runs` 테이블 추가 (2026-08-08)** — 두 PC 로컬 인스타 배치가 로그를 각 기계에만 남겨 중앙에서 실행 결과를 못 봐서 도입. 매 실행이 `{source, machine(os.hostname), started_at, finished_at, status, events, screenings, detail}` 한 줄 기록(`recordCrawlRun`, insta index.ts 비-dry 경로). 조회: `DOTENV_CONFIG_PATH=.env pnpm exec tsx --require dotenv/config scripts/runs.ts [개수] [source]`. **남은 것**: 웹앱에 "마지막 갱신" 노출, 그리고 굿즈/상영 크론에도 `recordCrawlRun` 확장(현재는 인스타만).
 - [ ] **사용자 수동 refresh** — 화면에서 직접 재수집 트리거. GitHub Actions `workflow_dispatch`를 API로 호출하거나, 별도 온디맨드 엔드포인트.
 - [ ] **매 실행 결과 알림 (성공/실패 모두 + 데이터 레벨 상세)** — 희망사항. 현재 GitHub 기본 알림은 잡 실패 시에만 오고 성공/내용 커스터마이징 불가. 원하는 것: (1) 성공해도 "성공했다" 알림, (2) TMDB 포스터 매칭 실패한 영화 목록처럼 **데이터 레벨 이슈**까지 알림. 구현하려면 Telegram/Discord/Slack webhook 스텝 추가 + `syncMovies`/`backfill`이 결과(매칭/실패 건수, 실패 제목)를 반환하도록 수정 필요. 채널 미정으로 보류.
 - [ ] **레포 public 전환** — Actions 무제한 확보용. 단 사전 필수: (1) 노출된 키 전부 재발급, (2) `docs/TODO.md` 등에서 실제 값 제거, (3) git 히스토리 세탁(키가 `890b2b5`부터 존재). 지금은 private 유지.
