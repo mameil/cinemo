@@ -19,8 +19,17 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LAUNCHD_LOG="$HOME/Library/Logs/cinemo-insta-local.launchd.log"
 
 [ -f "$WRAPPER" ] || { echo "래퍼 없음: $WRAPPER (레포를 풀 받았는지 확인)"; exit 1; }
-[ -f "$REPO_ROOT/.env" ] || echo "⚠️ .env 없음 — Turso/TMDB/Gemini/R2 키 필요 (.env.example 참고)"
-command -v pnpm >/dev/null 2>&1 || { echo "pnpm 이 PATH에 없음 — 설치 후 다시 실행"; exit 1; }
+command -v pnpm >/dev/null 2>&1 || { echo "pnpm 이 PATH에 없음 — Node.js+pnpm 설치 후 다시 실행 (brew install node && corepack enable)"; exit 1; }
+
+# 의존성 설치 (turnkey — 이미 설치돼 있으면 빠르게 통과)
+echo "의존성 설치 중…"
+(cd "$REPO_ROOT" && pnpm install --frozen-lockfile) || { echo "pnpm install 실패"; exit 1; }
+
+if [ ! -f "$REPO_ROOT/.env" ]; then
+  echo "⚠️ .env 없음 — Turso/TMDB/KOBIS/Gemini/R2 키가 있어야 수집이 적재됩니다."
+  echo "   집 맥의 $REPO_ROOT/.env 를 이 PC 레포 루트로 복사한 뒤 다시 실행하세요 (.env.example 참고)."
+  exit 1
+fi
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
 

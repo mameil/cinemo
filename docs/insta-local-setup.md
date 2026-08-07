@@ -58,16 +58,24 @@ powershell -ExecutionPolicy Bypass -File scripts\insta-local-setup.ps1
 
 ---
 
-## 🤖 Claude Code로 "알아서 걸기"
+## 🤖 Claude Code로 "알아서 걸기" (권장 경로)
 
-새 PC에서 레포를 풀 받은 뒤 Claude Code에게 이렇게 시키면 된다:
+새 PC에서 **레포 풀 받고 → Claude Code 열고 → "인스타 로컬 배치 걸어줘"** 하면 끝.
+사용자가 설치 절차를 몰라도 된다. Claude가 아래 런북을 자동 수행한다:
 
-> **"인스타 로컬 배치 걸어줘"**
+1. **OS 감지** (`win32` / `darwin`).
+2. **런타임 점검·설치** — Node.js·pnpm·Google Chrome이 없으면 **Claude가 직접 설치**한다.
+   - Windows: `winget install -e --id OpenJS.NodeJS.LTS` → `corepack enable` (pnpm) → `winget install -e --id Google.Chrome`.
+     설치 후 **PATH 반영을 위해 새 셸에서 이어서** 진행(현재 셸엔 방금 설치한 게 안 잡힐 수 있음).
+   - macOS: `brew install node` → `corepack enable` → `brew install --cask google-chrome`.
+3. **`.env` 확인** — 이게 유일하게 사람 손이 필요한 것(공개 레포라 키를 못 넣음). 없으면 Claude가
+   "집 맥의 레포 루트 `.env`를 이 PC 레포 루트로 복사해달라"고 요청한다. (이전에 크롤러를 돌린 PC면 이미 있을 수 있음.)
+4. **설치 스크립트 실행** — 맥 `sh scripts/insta-local-setup.sh` / 윈도우 `powershell -ExecutionPolicy Bypass -File scripts\insta-local-setup.ps1`.
+   (스크립트가 `pnpm install`까지 수행 → 스케줄러 등록.)
+5. **즉시 1회 실행 + 로그 확인** — 맥 `launchctl start …` / 윈도우 `Start-ScheduledTask …` 후 로그에 정상 종료(exit 0) 확인.
+6. 윈도우 첫 실행이라 `.ps1`/`.cmd`에 손볼 게 있으면 그 자리에서 고쳐 마무리.
 
-그러면 Claude가:
-1. OS를 감지해 위 setup 스크립트(맥=`.sh` / 윈도우=`.ps1`)를 실행하고,
-2. 전제(`.env`·Chrome·pnpm)를 점검한 뒤,
-3. 즉시 1회 실행으로 로그가 정상인지 확인한다.
+> **정리**: Claude가 런타임·의존성·스케줄러·검증을 다 한다. **사람이 챙길 건 딱 하나 — `.env`(비밀키) 파일이 레포 루트에 있는 것.** 그건 공개 레포에 못 담기 때문이다.
 
 ---
 
