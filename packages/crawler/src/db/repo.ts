@@ -94,6 +94,19 @@ export async function existsRaw(source: string, sourceId: string): Promise<boole
   return !!row;
 }
 
+/**
+ * 한 소스의 기처리 sourceId 전체를 Set으로 반환 (그리드 단계 dedup용).
+ * 로컬 인스타 수집이 이미 본 게시물의 상세 페이지를 아예 열지 않도록 —
+ * 잦은 폴링(시간별)에서 발자국·요청 수를 크게 줄인다.
+ */
+export async function getKnownSourceIds(source: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ sourceId: rawPosts.sourceId })
+    .from(rawPosts)
+    .where(eq(rawPosts.source, source));
+  return new Set(rows.map((r) => r.sourceId).filter((id): id is string => !!id));
+}
+
 // 체인+지점코드 → theaterId 캐시 (한 번의 ingest 안에서 중복 upsert 방지)
 const theaterCache = new Map<string, number>();
 

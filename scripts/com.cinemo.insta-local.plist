@@ -11,7 +11,10 @@
     즉시 1회 실행:  launchctl start com.cinemo.insta-local
     해제:          launchctl unload ~/Library/LaunchAgents/com.cinemo.insta-local.plist
 
-  KST 21:00 실행 (기존 insta.yml 크론과 동일 시각). 맥이 자고 있으면 깨어난 직후 실행된다.
+  매시 정각 실행, 단 낮 시간대만(KST 09:00~23:00). 독립관은 새벽에 게시하지 않으므로
+  밤새 도는 건 발자국만 늘고 이득이 없다. 그리드 단계 dedup 덕에 새 게시물이 없는
+  실행은 프로필 그리드만 보고 끝난다(상세 미조회). 맥이 자고 있으면 깨어난 뒤 밀린
+  슬롯을 1회로 합쳐 실행한다.
 -->
 <plist version="1.0">
 <dict>
@@ -24,15 +27,27 @@
         <string>/Users/kyudoshim/mameil-git/cinemo/scripts/insta-local.sh</string>
     </array>
 
+    <!-- 매시 정각 09~23시 (낮 시간대만) -->
     <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>21</integer>
-        <key>Minute</key>
-        <integer>0</integer>
-    </dict>
+    <array>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>22</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+    </array>
 
-    <!-- 예약 시각에 맥이 자고 있었으면 깨어난 뒤 밀린 실행을 1회 수행 -->
+    <!-- 로드 시 즉시 실행하지 않음 (예약 슬롯에만 실행; 자던 중이면 깨어난 뒤 1회) -->
     <key>RunAtLoad</key>
     <false/>
 

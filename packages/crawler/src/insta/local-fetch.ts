@@ -74,10 +74,16 @@ interface PostPageData {
 /**
  * Apify `instagram-post-scraper`와 동일 시그니처의 로컬 수집.
  * 계정별 프로필 그리드에서 최신 limit개 링크 → 게시물 og 태그 수집.
+ *
+ * seenIds(기처리 media ID Set)를 주면 그리드 링크 단계에서 이미 본 게시물의
+ * 상세 페이지를 아예 열지 않는다 — 시간별 폴링에서 새 게시물이 없는 대부분의
+ * 실행이 프로필 그리드만 보고 끝나 요청 수·차단 위험을 크게 줄인다.
+ * (파싱 실패로 raw_posts에 없는 게시물은 seenIds에 없으니 다음 실행에서 재시도됨)
  */
 export async function fetchPostsLocal(
   handles: string[],
-  limit: number
+  limit: number,
+  seenIds?: Set<string>
 ): Promise<ApifyPost[]> {
   // puppeteer-core는 로컬 전용 의존성 — CI(Apify 경로)에선 import되지 않게 지연 로드
   const { default: puppeteer } = await import("puppeteer-core");
@@ -91,6 +97,7 @@ export async function fetchPostsLocal(
 
   const posts: ApifyPost[] = [];
   let emptyAccounts = 0;
+  let skippedSeen = 0;
 
   try {
     const page = await browser.newPage();
@@ -128,6 +135,11 @@ export async function fetchPostsLocal(
         for (const url of targets) {
           const shortCode = url.match(/\/(?:p|reel)\/([^/]+)/)?.[1];
           if (!shortCode) continue;
+          // 그리드 단계 dedup — 이미 본 게시물이면 상세 페이지를 열지 않는다
+          if (seenIds?.has(shortCodeToMediaId(shortCode))) {
+            skippedSeen++;
+            continue;
+          }
           try {
             await page.goto(url, { waitUntil: "networkidle2", timeout: 40_000 });
             await pace();
@@ -200,10 +212,16 @@ export async function fetchPostsLocal(
     await browser.close();
   }
 
-  // fail-loud: 전 계정이 비면 인스타 익명 정책 변경 신호 — 조용히 0건 적재하지 않는다
-  if (handles.length > 0 && posts.length === 0) {
+  if (skippedSeen > 0) {
+    console.log(`  [로컬] 기처리 ${skippedSeen}건 그리드 단계 스킵 (상세 미조회)`);
+  }
+
+  // fail-loud: "새 게시물이 없어 0건"(정상)과 "차단당해 0건"(사고)을 구분한다.
+  // 그리드 링크를 준 계정이 하나도 없으면(=전 계정 프로필 접근 실패) 익명 차단 신호로 보고 throw.
+  // 그리드는 읽혔는데 전부 기처리라 posts가 비는 건 정상 — 그대로 빈 배열 반환.
+  if (handles.length > 0 && emptyAccounts === handles.length) {
     throw new Error(
-      `로컬 인스타 수집 전멸 (${handles.length}계정 중 실패 ${emptyAccounts}) — ` +
+      `로컬 인스타 수집 — 전 계정(${handles.length}) 프로필 접근 실패. ` +
         `익명 접근 차단 가능성. Apify 폴백(workflow_dispatch --max=2)을 사용할 것`
     );
   }
