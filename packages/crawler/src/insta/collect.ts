@@ -14,7 +14,7 @@
  */
 
 import type { CollectedEvent, CollectedScreening } from "../domain";
-import { existsRaw, saveRaw } from "../db/repo";
+import { existsRaw, saveRaw, getKnownSourceIds } from "../db/repo";
 import { copyImageToR2 } from "../lib/r2";
 import { assertApifyBudget } from "../lib/budget-guard";
 import { getParser, type ParsedGoodiePost } from "./parse";
@@ -214,11 +214,18 @@ export async function collectInsta(opts: InstaCollectOptions = {}): Promise<Inst
   console.log(
     `  대상 ${accounts.length}계정 × 최근 ${limit}개 (${fetcher === "local" ? "로컬 Chrome" : "Apify"})`
   );
+  // 로컬 수집은 그리드 단계 dedup으로 기처리 게시물의 상세 조회를 건너뛴다(시간별 폴링 대비).
+  // dry는 결과를 다 보여줘야 하므로 seenIds 미적용. 시드는 과거 아카이브가 목적이라 역시 미적용.
+  const seenIds =
+    fetcher === "local" && !opts.dry && !opts.seed
+      ? await getKnownSourceIds("INSTA")
+      : undefined;
   const posts =
     fetcher === "local"
       ? await (await import("./local-fetch")).fetchPostsLocal(
           accounts.map((a) => a.handle),
-          limit
+          limit,
+          seenIds
         )
       : await fetchPosts(accounts.map((a) => a.handle), limit);
   console.log(`  게시물 ${posts.length}건 수신`);
