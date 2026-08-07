@@ -43,7 +43,8 @@ pnpm --filter @cinemo/crawler <cgv|lotte|megabox|kobis-backfill|tmdb|cgv-schedul
   (위 `pnpm --filter` 스크립트가 이미 이걸 감싸므로, 가능하면 스크립트 사용.)
 - **환경변수**는 루트 `.env` (예시: `.env.example`). Turso · TMDB · KOBIS 키 + `CURL_IMPERSONATE_BIN`.
 - **CGV는 Cloudflare 우회 필요** — [lexiforest/curl-impersonate](https://github.com/lexiforest/curl-impersonate) 바이너리 경로를 `CURL_IMPERSONATE_BIN`에 지정. GitHub Actions에선 워크플로우가 자동 설치.
-- **자동화**: `.github/workflows/crawl.yml`(풀 1회 + 경량 4회/일, 특전/굿즈) · `schedule.yml`(매일 13시 KST, 상영시간표) · `insta.yml`(매일 21시 KST, 독립영화관 인스타). 실패 시 GitHub 기본 알림. public 레포라 Actions 분량 무제한 — 단 **Apify는 월 $5 무료**라 인스타는 예산 가드로 방어(80% 컷).
+- **자동화**: `.github/workflows/crawl.yml`(풀 1회 + 경량 4회/일, 특전/굿즈) · `schedule.yml`(매일 13시 KST, 상영시간표) · `insta.yml`(매일 21시 KST, 독립영화관 인스타 — **Apify 폴백**). 실패 시 GitHub 기본 알림. public 레포라 Actions 분량 무제한 — 단 **Apify는 월 $5 무료**라 인스타는 예산 가드로 방어(80% 컷).
+- **인스타 로컬 수집(C안)**: 인스타 주 수집은 이제 **개인 PC 로컬 배치**(무로그인 Chrome, Apify 크레딧 0). 집=맥(launchd)·회사=윈도우(작업 스케줄러) 매시 09~23시. 새 PC에서 걸려면 레포 풀 받고 **"인스타 로컬 배치 걸어줘"** → OS 감지해 `scripts/insta-local-setup.{sh,ps1}` 실행. 상세: [docs/insta-local-setup.md](docs/insta-local-setup.md).
 - **10분 넘는 장기 실행(시드 등)은 세션 백그라운드 금지** — 터미널 닫으면 같이 죽는다 (07-25 상상마당 시드 중단 사고). `nohup <명령> > /tmp/시드.log 2>&1 &`로 세션과 분리하고 로그 파일로 확인할 것.
 - **배포**: Vercel — **https://mameil-cinemo.vercel.app** (master push 시 자동 배포, Root=apps/web, 환경변수는 Turso 2개만).
 - 영화는 **제목 정규화로 교차 체인 dedup** 후 KOBIS/TMDB 백필. (`db/movie-match.ts`)

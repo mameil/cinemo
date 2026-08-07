@@ -18,10 +18,27 @@
  *     (fail-loud). 그날은 Apify 폴백(workflow_dispatch)으로.
  */
 
+import { existsSync } from "fs";
 import type { ApifyPost } from "./collect";
 
-const CHROME_DEFAULT =
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+/**
+ * 시스템 Chrome 실행 파일 경로 (OS 자동 감지).
+ * env CHROME_BIN 이 있으면 우선. 맥/윈도우 표준 설치 경로를 순서대로 탐색한다.
+ * (집=맥 · 회사=윈도우 데스크탑 교대 사용 대비 — docs/insta-local-setup.md)
+ */
+function resolveChrome(): string {
+  if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
+  const candidates =
+    process.platform === "win32"
+      ? [
+          "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+          `${process.env.LOCALAPPDATA ?? ""}\\Google\\Chrome\\Application\\chrome.exe`,
+        ]
+      : ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"];
+  return candidates.find((p) => p && existsSync(p)) ?? candidates[0];
+}
+
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36";
 
@@ -87,10 +104,10 @@ export async function fetchPostsLocal(
 ): Promise<ApifyPost[]> {
   // puppeteer-core는 로컬 전용 의존성 — CI(Apify 경로)에선 import되지 않게 지연 로드
   const { default: puppeteer } = await import("puppeteer-core");
-  const chromePath = process.env.CHROME_BIN || CHROME_DEFAULT;
+  const chromePath = resolveChrome();
 
   const browser = await puppeteer.launch({
-    headless: true, // launchd 무창 실행 — UA 오버라이드로 HeadlessChrome 표기 제거 (실측 통과)
+    headless: true, // 무창 실행(launchd/작업 스케줄러) — UA 오버라이드로 HeadlessChrome 표기 제거
     executablePath: chromePath,
     args: ["--no-sandbox", "--disable-gpu"],
   });
