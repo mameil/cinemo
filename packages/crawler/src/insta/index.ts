@@ -12,7 +12,7 @@
  */
 
 import { collectInsta, buildEvents, fetchPosts, type ApifyPost } from "./collect";
-import { ingest, ingestScreenings, upsertTheater } from "../db/repo";
+import { ingest, ingestScreenings, upsertTheater, recordCrawlRun } from "../db/repo";
 import { parseTimetable, noteToFormat } from "./timetable";
 import type { ParsedGoodiePost } from "./parse";
 import { INSTA_ACCOUNTS } from "./accounts";
@@ -281,9 +281,9 @@ async function main() {
   }
 
   console.log(`=== 인스타 수집 시작 ${dry ? "(dry-run: DB 미적재)" : ""} ===`);
-  const { events, screenings } = await collectInsta({ maxPosts, dry, only, fetcher });
 
   if (dry) {
+    const { events, screenings } = await collectInsta({ maxPosts, dry, only, fetcher });
     for (const ev of events) {
       console.log(`\n[${ev.sourceEventId}] ${ev.eventName}`);
       console.log(`  기간: ${ev.startDate} ~ ${ev.endDate} | 영화: ${ev.movieTitle ?? "-"}`);
@@ -293,13 +293,42 @@ async function main() {
     return;
   }
 
-  const stats = await ingest("INDIE", events);
-  console.log("=== 이벤트 적재 완료 ===");
-  console.log(stats);
-  if (screenings.length) {
-    const sStats = await ingestScreenings("INDIE", screenings);
-    console.log("=== 상영 적재 완료 ===");
-    console.log(sStats);
+  // 비-dry 실행은 crawl_runs에 결과를 남긴다 — 두 PC 로컬 배치를 어디서든 가시화 (2026-08-08).
+  const runSource =
+    fetcher === "local" || process.env.INSTA_FETCHER === "local"
+      ? "insta-local"
+      : "insta-apify";
+  const startedAt = new Date().toISOString();
+  try {
+    const { events, screenings } = await collectInsta({ maxPosts, only, fetcher });
+    const stats = await ingest("INDIE", events);
+    console.log("=== 이벤트 적재 완료 ===");
+    console.log(stats);
+    let screeningCount = 0;
+    if (screenings.length) {
+      const sStats = await ingestScreenings("INDIE", screenings);
+      console.log("=== 상영 적재 완료 ===");
+      console.log(sStats);
+      screeningCount = sStats.screenings;
+    }
+    await recordCrawlRun({
+      source: runSource,
+      startedAt,
+      status: "success",
+      events: stats.events,
+      screenings: screeningCount,
+      detail:
+        `이벤트 ${stats.events} / 상영 ${screeningCount}회차` +
+        (stats.skipped ? ` / 스킵 ${stats.skipped}` : ""),
+    });
+  } catch (err) {
+    await recordCrawlRun({
+      source: runSource,
+      startedAt,
+      status: "error",
+      detail: (err as Error).message.slice(0, 300),
+    });
+    throw err; // exit 1 유지 (스케줄러/로그에도 실패로 남게)
   }
 }
 

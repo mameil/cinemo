@@ -185,3 +185,22 @@ export const screenings = sqliteTable(
     index("screenings_movie_idx").on(t.movieId),
   ]
 );
+
+// ── 배치 실행 기록 ────────────────────────────────
+// 로컬 인스타 배치(두 PC)는 로그가 각 기계에만 남아 중앙에서 실행 여부·결과를 알 수 없었다.
+// 매 실행이 여기 한 줄 남겨 어디서든(Turso 조회/웹앱) 가시화한다. (2026-08-08)
+export const crawlRuns = sqliteTable(
+  "crawl_runs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    source: text("source").notNull(), // insta-local | insta-apify | (향후 확장)
+    machine: text("machine").notNull(), // os.hostname() — 회사맥/회사데탑 구분
+    startedAt: text("started_at").notNull(),
+    finishedAt: text("finished_at"),
+    status: text("status").notNull(), // success | error
+    events: integer("events"), // 적재(upsert)된 이벤트 수
+    screenings: integer("screenings"), // 적재된 상영 회차 수
+    detail: text("detail"), // 사람이 읽는 요약 또는 에러 메시지
+  },
+  (t) => [index("crawl_runs_started_idx").on(t.startedAt)]
+);

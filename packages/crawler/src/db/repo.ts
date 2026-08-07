@@ -7,6 +7,7 @@
  * - events / goodies / theaters / goods_stock: 자연키 기준 upsert (재실행 중복 방지)
  */
 
+import { hostname } from "os";
 import {
   db,
   events,
@@ -15,6 +16,7 @@ import {
   theaters,
   rawPosts,
   screenings,
+  crawlRuns,
 } from "@cinemo/shared";
 import type {
   Chain,
@@ -92,6 +94,35 @@ export async function existsRaw(source: string, sourceId: string): Promise<boole
     .where(and(eq(rawPosts.source, source), eq(rawPosts.sourceId, sourceId)))
     .limit(1);
   return !!row;
+}
+
+/**
+ * 배치 실행 1건을 crawl_runs에 기록한다 (두 PC 로컬 배치 가시화 — 2026-08-08).
+ * machine은 os.hostname()으로 자동(회사맥/회사데탑 구분). finishedAt은 기록 시점.
+ * 기록 실패가 배치 성패에 영향 주지 않도록 예외를 삼킨다.
+ */
+export async function recordCrawlRun(run: {
+  source: string;
+  startedAt: string;
+  status: "success" | "error";
+  events?: number;
+  screenings?: number;
+  detail?: string;
+}): Promise<void> {
+  try {
+    await db.insert(crawlRuns).values({
+      source: run.source,
+      machine: hostname(),
+      startedAt: run.startedAt,
+      finishedAt: new Date().toISOString(),
+      status: run.status,
+      events: run.events ?? null,
+      screenings: run.screenings ?? null,
+      detail: run.detail ?? null,
+    });
+  } catch (e) {
+    console.error(`  ⚠️ crawl_runs 기록 실패: ${(e as Error).message.slice(0, 100)}`);
+  }
 }
 
 /**
