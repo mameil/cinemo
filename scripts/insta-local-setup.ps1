@@ -16,15 +16,21 @@ $Wrapper  = Join-Path $RepoRoot "scripts\insta-local.cmd"
 $TaskName = "cinemo-insta-local"
 
 if (-not (Test-Path $Wrapper)) { throw "래퍼 없음: $Wrapper (레포를 풀 받았는지 확인)" }
-if (-not (Test-Path (Join-Path $RepoRoot ".env"))) {
-    Write-Warning ".env 없음 — Turso/TMDB/Gemini/R2 키가 있어야 수집이 적재됩니다. .env.example 참고."
+
+# 사전 점검: node / pnpm
+foreach ($bin in @("node", "pnpm")) {
+    if (-not (Get-Command $bin -ErrorAction SilentlyContinue)) {
+        throw "$bin 이(가) PATH에 없음 — Node.js + pnpm 설치 후 다시 실행하세요 (winget install OpenJS.NodeJS.LTS; corepack enable)."
+    }
 }
 
-# 사전 점검: pnpm / node / Chrome
-foreach ($bin in @("pnpm", "node")) {
-    if (-not (Get-Command $bin -ErrorAction SilentlyContinue)) {
-        throw "$bin 이(가) PATH에 없음 — Node.js + pnpm 설치 후 다시 실행하세요."
-    }
+# 의존성 설치 (turnkey — 이미 설치돼 있으면 빠르게 통과)
+Write-Host "의존성 설치 중…"
+pnpm -C "$RepoRoot" install --frozen-lockfile
+if ($LASTEXITCODE -ne 0) { throw "pnpm install 실패" }
+
+if (-not (Test-Path (Join-Path $RepoRoot ".env"))) {
+    throw ".env 없음 — Turso/TMDB/KOBIS/Gemini/R2 키가 있어야 적재됩니다. 집 맥의 .env를 이 PC 레포 루트로 복사 후 다시 실행 (.env.example 참고)."
 }
 $chrome = @(
     "C:\Program Files\Google\Chrome\Application\chrome.exe",
