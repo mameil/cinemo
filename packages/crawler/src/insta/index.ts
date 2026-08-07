@@ -7,6 +7,8 @@
  *     # 이미 수집된 "극장" 게시물(R2 이미지)에서 시간표만 재추출 → screenings 적재
  *   pnpm --filter @cinemo/crawler insta -- --seed --max=50
  *     # 계정 활성화 시 1회: 과거 게시물 아카이브만 (이벤트 미생성 — 동명 영화 판별용)
+ *   pnpm --filter @cinemo/crawler insta -- --local
+ *     # 집 맥 Chrome으로 무로그인 수집 (Apify 크레딧 미사용 — launchd 데일리용)
  */
 
 import { collectInsta, buildEvents, fetchPosts, type ApifyPost } from "./collect";
@@ -240,6 +242,11 @@ async function main() {
   const maxPosts = maxArg ? Number(maxArg.split("=")[1]) : undefined;
   const onlyArg = args.find((a) => a.startsWith("--only="));
   const only = onlyArg ? onlyArg.split("=")[1].split(",").filter(Boolean) : undefined;
+  // 수집 경로: --local(집 맥 Chrome, Apify 크레딧 미사용) / 기본 Apify.
+  // env INSTA_FETCHER=local 로도 지정됨 (launchd에서 사용).
+  const fetcher: "apify" | "local" | undefined = args.includes("--local")
+    ? "local"
+    : undefined;
 
   // 게시물·특전·상영 회차가 아직 없는 관도 웹 필터에서 안정적인 ID로 표시되도록
   // 매 실행 시 v1 대상 12관을 먼저 등록한다.
@@ -268,13 +275,13 @@ async function main() {
   const seed = args.includes("--seed");
   if (seed) {
     console.log(`=== 인스타 시드 아카이브 ${dry ? "(dry-run)" : ""} — 이벤트 미생성 ===`);
-    await collectInsta({ maxPosts: maxPosts ?? 50, dry, seed: true, only });
+    await collectInsta({ maxPosts: maxPosts ?? 50, dry, seed: true, only, fetcher });
     console.log("=== 시드 완료 ===");
     return;
   }
 
   console.log(`=== 인스타 수집 시작 ${dry ? "(dry-run: DB 미적재)" : ""} ===`);
-  const { events, screenings } = await collectInsta({ maxPosts, dry, only });
+  const { events, screenings } = await collectInsta({ maxPosts, dry, only, fetcher });
 
   if (dry) {
     for (const ev of events) {

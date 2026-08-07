@@ -43,6 +43,12 @@ export interface InstaCollectOptions {
    * 계정별 시드용 — 12계정 일괄 시드는 Apify run-sync 300초 한도를 초과한다.
    */
   only?: string[];
+  /**
+   * 수집 경로 (기본 apify). "local"은 집 맥의 Chrome으로 무로그인 수집 —
+   * Apify 크레딧 소모 없음 (launchd 데일리용, local-fetch.ts 참조).
+   * env INSTA_FETCHER=local 로도 지정 가능.
+   */
+  fetcher?: "apify" | "local";
 }
 
 export interface ApifyPost {
@@ -192,7 +198,9 @@ export interface InstaCollectResult {
 export async function collectInsta(opts: InstaCollectOptions = {}): Promise<InstaCollectResult> {
   // 과금 방어: 게시물 수 하드캡(일상 100 / 시드 200) + Apify 크레딧 사전 점검 (80% 초과 시 중단)
   const limit = Math.min(opts.maxPosts ?? 5, opts.seed ? 200 : 100);
-  await assertApifyBudget();
+  const fetcher =
+    opts.fetcher ?? (process.env.INSTA_FETCHER === "local" ? "local" : "apify");
+  if (fetcher === "apify") await assertApifyBudget(); // 로컬 수집은 Apify 크레딧 미사용
   const onlySet = opts.only?.length ? new Set(opts.only.map((h) => h.toLowerCase())) : null;
   const accounts = INSTA_ACCOUNTS.filter(
     (a) => a.enabled && (!onlySet || onlySet.has(a.handle.toLowerCase()))
@@ -203,8 +211,16 @@ export async function collectInsta(opts: InstaCollectOptions = {}): Promise<Inst
   }
   const byHandle = new Map(accounts.map((a) => [a.handle.toLowerCase(), a]));
 
-  console.log(`  대상 ${accounts.length}계정 × 최근 ${limit}개 (Apify)`);
-  const posts = await fetchPosts(accounts.map((a) => a.handle), limit);
+  console.log(
+    `  대상 ${accounts.length}계정 × 최근 ${limit}개 (${fetcher === "local" ? "로컬 Chrome" : "Apify"})`
+  );
+  const posts =
+    fetcher === "local"
+      ? await (await import("./local-fetch")).fetchPostsLocal(
+          accounts.map((a) => a.handle),
+          limit
+        )
+      : await fetchPosts(accounts.map((a) => a.handle), limit);
   console.log(`  게시물 ${posts.length}건 수신`);
 
   const parser = getParser();

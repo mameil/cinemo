@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  인스타 로컬 수집 launchd 에이전트 (C안, 2026-08-07)
+
+  설치:
+    1) 이 파일의 ProgramArguments 경로를 이 PC의 레포 클론 경로에 맞게 확인
+       (집/회사 PC 경로가 다르면 각 PC에서 수정)
+    2) cp scripts/com.cinemo.insta-local.plist ~/Library/LaunchAgents/
+    3) launchctl load ~/Library/LaunchAgents/com.cinemo.insta-local.plist
+    4) 확인:  launchctl list | grep cinemo
+    즉시 1회 실행:  launchctl start com.cinemo.insta-local
+    해제:          launchctl unload ~/Library/LaunchAgents/com.cinemo.insta-local.plist
+
+  KST 21:00 실행 (기존 insta.yml 크론과 동일 시각). 맥이 자고 있으면 깨어난 직후 실행된다.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cinemo.insta-local</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>/Users/kyudoshim/mameil-git/cinemo/scripts/insta-local.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>21</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- 예약 시각에 맥이 자고 있었으면 깨어난 뒤 밀린 실행을 1회 수행 -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/kyudoshim/Library/Logs/cinemo-insta-local.launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/kyudoshim/Library/Logs/cinemo-insta-local.launchd.log</string>
+</dict>
+</plist>
