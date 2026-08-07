@@ -27,6 +27,10 @@
 - ✅ **타입체크 filter 강제** — 쉘 cwd 유지 특성 탓에 `cd 후 tsc`를 엉뚱한 디렉토리에서 돌려 가짜 에러 수백 줄을 만난 사고가 한 세션에 3회. `pnpm --filter @cinemo/web exec tsc --noEmit`(cwd 무관)로 CLAUDE.md에 박제. (2026-07-19)
 - ✅ **장기 실행은 nohup으로 세션 분리** — 상상마당 시드(80건, 20~40분)를 세션 백그라운드로 돌리다 터미널 종료와 함께 9건째에서 사망, 예약해둔 "완료 후 커밋·푸시"도 증발 (2026-07-25). 10분 넘는 작업은 `nohup ... > 로그파일 2>&1 &`로 세션과 분리하고 로그 파일로 진행을 확인하도록 CLAUDE.md에 박제. Actions `workflow_dispatch`로 옮기는 대안은 당시 Actions 사용 불가로 보류 → 07-26 public 전환으로 Actions는 살아났지만, 시드 같은 1회성 대량 작업은 로컬 nohup이 여전히 간편(Secrets·트리거 불필요). 규칙 유지. (2026-07-25, 07-26 갱신)
 - ✅ **로컬 무료 수집 + 클라우드 유료 폴백 패턴 (인스타 C안)** — 인스타 수집을 유료 벤더(Apify $5/월)에 전적으로 의존하다 시드·캐치업 누적으로 크레딧 소진→크론 실패 (2026-08-02). 실측으로 규명한 핵심: **벤더가 팔던 건 지능이 아니라 IP**다 — GitHub Actions(데이터센터 IP)는 인스타가 차단하지만, 집 맥(주거용 IP)에선 로그인 없이 프로필 그리드+게시물 og 태그(캡션 전문·이미지·날짜)가 전부 나온다. 판단이 필요한 파싱은 이미 Gemini가 하니, 수집 자체는 지능 불필요한 기계 작업 → "나(Claude)를 주기적으로 부르기"는 세상에서 제일 비싼 크론. 대신 **puppeteer-core 로컬 수집기(`insta/local-fetch.ts`) + launchd 데일리 실행**으로 상시 무료화하고, **Apify는 폴백으로 유지**(인스타가 익명 접근 조이는 날 복귀 · 딥 카러셀/시드용). 출력을 기존 `ApifyPost` 모양으로 맞춰 dedup·Gemini·R2 파이프라인 무변경 재사용, id는 shortCode→media ID 디코드로 Apify와 정확히 일치(중복 미생성 실증). 일반화: **정형·기계적 수집은 로컬 무료 경로를 1선으로, 유료 벤더는 폴백으로**. 함정 2개도 박제 — ① tsx(esbuild) keep-names가 주입한 `__name`이 page.evaluate에서 미정의 → 문서마다 no-op `__name` 선주입 ② 워크트리엔 `.env` 부재(메인 체크아웃 루트에만) → 래퍼는 자기 위치서 레포 루트 유도(두 PC 교대 대비). (2026-08-07)
+  - **크로스플랫폼 확장 (2026-08-07)**: 집=맥·회사=윈도우 데스크탑 교대 → OS별 대칭 구성. 래퍼 `insta-local.{sh,cmd}`,
+    설치 `insta-local-setup.{sh,ps1}`(맥 launchd / 윈도우 작업 스케줄러, 둘 다 매시 09~23시·idempotent), Chrome 경로 OS 자동 감지.
+    "새 PC에서 레포 풀 → Claude에게 **'인스타 로컬 배치 걸어줘'** → OS 감지해 setup 실행"을 CLAUDE.md·[insta-local-setup.md](insta-local-setup.md)에 박제.
+    윈도우 함정: pnpm 스크립트의 POSIX 인라인 env(`VAR=val cmd`)가 안 먹음 → 래퍼가 절대경로 `DOTENV_CONFIG_PATH` 설정 후 `pnpm exec tsx` 직접 호출.
 
 ## 프로젝트 규칙으로 이관 (하네스 아님 — 도메인 스펙)
 
