@@ -286,6 +286,8 @@ async function handleGet(req: NextRequest) {
   });
 
   // 6) 커버리지 (지점 수 + 극장 목록 + 지역 그룹)
+  // 선택 날짜에 회차가 있는 극장 = "상영 중". 카탈로그로만 추가된 곳은 그 날 "쉬는 날".
+  const openTheaterIds = new Set(rows.map((r) => r.theaterId));
   const theaterInfoMap = new Map<number, { id: number; chain: string; branchName: string }>();
   for (const r of rows) {
     if (!theaterInfoMap.has(r.theaterId)) {
@@ -331,7 +333,11 @@ async function handleGet(req: NextRequest) {
   }
 
   const theaterList = [...theaterInfoMap.values()]
-    .map((t) => ({ ...t, area: t.chain === "INDIE" ? "독립영화관" : getArea(t.branchName) }))
+    .map((t) => ({
+      ...t,
+      area: t.chain === "INDIE" ? "독립영화관" : getArea(t.branchName),
+      openToday: openTheaterIds.has(t.id), // 그 날 상영 있음 여부 (없으면 필터에 '쉼' 표시)
+    }))
     .sort((a, b) => a.area.localeCompare(b.area) || a.branchName.localeCompare(b.branchName));
 
   // DB에 존재하는 마지막 상영일 — 홈 날짜 스트립이 하드코딩 대신 이 값까지 그린다

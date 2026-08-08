@@ -41,6 +41,8 @@ export interface TheaterInfo {
   chain: string;
   branchName: string;
   area: string;
+  /** 선택 날짜에 상영이 있는지 — false면 그 날 쉬는 극장 (필터에 '쉼' 표시) */
+  openToday?: boolean;
 }
 
 interface MovieMini {
@@ -189,21 +191,25 @@ export default function HomeHeader({
                 <div className="flex flex-wrap gap-1.5 pl-1">
                   {list.map((t) => {
                     const active = !excludedTheaters.has(t.id);
+                    const closed = t.openToday === false; // 그 날 쉬는 극장
                     return (
                       <button
                         key={t.id}
                         onClick={() => onToggleTheater(t.id)}
                         className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11.5px] transition-colors ${
-                          active
-                            ? "border-line bg-panel text-ink-2"
-                            : "border-line-soft bg-ground text-ink-3 line-through opacity-50"
+                          closed
+                            ? "border-line-soft bg-ground text-ink-3 opacity-60"
+                            : active
+                              ? "border-line bg-panel text-ink-2"
+                              : "border-line-soft bg-ground text-ink-3 line-through opacity-50"
                         }`}
                       >
                         <span
                           className="h-[6px] w-[6px] rounded-full flex-none"
-                          style={{ background: active ? (CHAIN_COLORS[t.chain] ?? "#999") : "#ccc" }}
+                          style={{ background: active && !closed ? (CHAIN_COLORS[t.chain] ?? "#999") : "#ccc" }}
                         />
                         {t.branchName}
+                        {closed && <span className="ml-0.5 text-[9.5px] text-ink-3">· 쉼</span>}
                       </button>
                     );
                   })}
