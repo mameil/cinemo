@@ -279,18 +279,10 @@ export async function collectInsta(opts: InstaCollectOptions = {}): Promise<Inst
       continue;
     }
 
-    // 극장 소식(시간표류)이면 시간표 2차 추출 → 홈 시간표 합류
-    let postScreenings: CollectedScreening[] = [];
-    if (parsed.category === "극장") {
-      try {
-        postScreenings = await extractScreenings(post, account, cdnImages);
-        if (postScreenings.length) {
-          console.log(`  🎞️ 시간표 추출 [${account.theaterName}] ${postScreenings.length}회차`);
-        }
-      } catch (err) {
-        console.error(`  ⚠️ 시간표 추출 실패 [${post.id}]: ${(err as Error).message.slice(0, 100)}`);
-      }
-    }
+    // 인스타 시간표 추출 중단 (2026-08-08): 독립관 상영은 전부 공식 예매처(Dtryx·MOVIEE 등)로
+    // 이관 완료 → 인스타는 굿즈·소진·새 영화소식 전용. (인스타 OCR 시간표는 이미지 지연·부정확)
+    // extractScreenings 함수는 --backfill-timetable 등 수동 경로 대비로 남겨둔다.
+    const postScreenings: CollectedScreening[] = [];
 
     if (opts.dry) {
       console.log(

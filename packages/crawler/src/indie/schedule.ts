@@ -7,13 +7,16 @@
 
 import type { CollectedScreening } from "../domain";
 import { collectArirangScreenings } from "./arirang";
+import { collectArtnineScreenings } from "./artnine";
 import { collectCinecubeScreenings } from "./cinecube";
 import { collectDeosupScreenings } from "./deosup";
 import { collectEmuScreenings } from "./emu";
 import { collectFilmforumScreenings } from "./filmforum";
 import { collectIndiespaceScreenings } from "./indiespace";
+import { collectKuScreenings } from "./ku";
 import { collectLaikaScreenings } from "./laika";
 import { collectMomoScreenings } from "./momo";
+import { collectSangsangScreenings } from "./sangsang";
 import { collectSeoulArtCinemaScreenings } from "./seoulartcinema";
 
 interface IndieSource {
@@ -23,6 +26,9 @@ interface IndieSource {
 
 const SOURCES: IndieSource[] = [
   { label: "라이카시네마", collect: collectLaikaScreenings },
+  { label: "아트나인", collect: collectArtnineScreenings },
+  { label: "KT&G 상상마당 시네마", collect: collectSangsangScreenings },
+  { label: "KU시네마테크", collect: collectKuScreenings },
   { label: "아리랑시네센터", collect: collectArirangScreenings },
   { label: "씨네큐브", collect: collectCinecubeScreenings },
   { label: "더숲 아트시네마", collect: collectDeosupScreenings },
