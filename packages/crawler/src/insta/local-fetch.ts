@@ -106,11 +106,23 @@ export async function fetchPostsLocal(
   const { default: puppeteer } = await import("puppeteer-core");
   const chromePath = resolveChrome();
 
-  const browser = await puppeteer.launch({
-    headless: true, // 무창 실행(launchd/작업 스케줄러) — UA 오버라이드로 HeadlessChrome 표기 제거
+  // 절전 복귀 직후·부하 시 Chrome 기동이 느려 "WS endpoint ... Timed out 30000ms"가 나므로
+  // 타임아웃을 늘리고(30→60s) 1회 재시도한다 (2026-08-08 집맥 error 대응).
+  const launchOpts = {
+    headless: true as const, // 무창 실행(launchd/작업 스케줄러) — UA 오버라이드로 HeadlessChrome 표기 제거
     executablePath: chromePath,
     args: ["--no-sandbox", "--disable-gpu"],
-  });
+    timeout: 60_000,
+    protocolTimeout: 120_000,
+  };
+  let browser;
+  try {
+    browser = await puppeteer.launch(launchOpts);
+  } catch (e) {
+    console.warn(`  ⚠️ [로컬] Chrome 기동 실패 1회 — 3초 후 재시도: ${(e as Error).message.slice(0, 80)}`);
+    await new Promise((r) => setTimeout(r, 3000));
+    browser = await puppeteer.launch(launchOpts);
+  }
 
   const posts: ApifyPost[] = [];
   let emptyAccounts = 0;

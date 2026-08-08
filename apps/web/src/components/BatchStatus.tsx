@@ -29,10 +29,17 @@ function stamp(iso: string): string {
 }
 
 /** 로컬 배치(두 PC) 실행 상태 — 헤더 버튼 → 드롭다운. crawl_runs를 /api/batch-runs로 조회. */
+interface Totals {
+  indieEvents: number;
+  indieScreenings: number;
+  lastCollectedAt: string | null;
+}
+
 export default function BatchStatus() {
   const [open, setOpen] = useState(false);
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [byMachine, setByMachine] = useState<Run[]>([]);
+  const [totals, setTotals] = useState<Totals | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
@@ -42,9 +49,10 @@ export default function BatchStatus() {
     try {
       const res = await fetch("/api/batch-runs");
       if (!res.ok) throw new Error(String(res.status));
-      const j = (await res.json()) as { runs: Run[]; byMachine: Run[] };
+      const j = (await res.json()) as { runs: Run[]; byMachine: Run[]; totals: Totals };
       setRuns(j.runs);
       setByMachine(j.byMachine);
+      setTotals(j.totals);
     } catch {
       setError(true);
     } finally {
@@ -97,6 +105,17 @@ export default function BatchStatus() {
             </p>
           )}
 
+          {/* 누적 수집량 — per-run 0("신규 없음")이 "비어있음"으로 오해되지 않게 */}
+          {totals && (
+            <div className="mb-2 rounded-lg bg-app-tint/50 px-2.5 py-1.5 text-[11px] text-ink-2">
+              <span className="font-semibold text-app">수집 누적</span> · 이벤트{" "}
+              {totals.indieEvents} · 상영 {totals.indieScreenings}회차
+              {totals.lastCollectedAt && (
+                <span className="text-ink-3"> · 마지막 신규 {ago(totals.lastCollectedAt)}</span>
+              )}
+            </div>
+          )}
+
           {runs !== null && runs.length > 0 && (
             <>
               {/* 기계별 최신 요약 */}
@@ -118,7 +137,7 @@ export default function BatchStatus() {
                       <div className="text-[10.5px] text-ink-3">
                         {r.source} · {ago(r.startedAt)}
                         {r.status === "success"
-                          ? ` · 이벤트 ${r.events ?? 0}/상영 ${r.screenings ?? 0}`
+                          ? ` · 신규 ${(r.events ?? 0) + (r.screenings ?? 0)}건`
                           : " · 실패"}
                       </div>
                     </div>

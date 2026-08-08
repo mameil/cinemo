@@ -14,6 +14,9 @@
 - `components/BatchStatus.tsx` — 헤더 신선도 옆 "◷ 배치" 버튼 → 드롭다운. 기계별 최신(초록/빨강 점) + 최근 실행 로그. 열 때마다 새로고침.
 - 검증: 프로덕션 빌드에 `/api/batch-runs` 라우트 포함, 서버 기동해 실제 crawl_runs JSON 반환·홈에 버튼 렌더 확인.
 - 관련: `crawl_runs` 테이블/기록은 [ingest-tasks.md](ingest-tasks.md) 참고. 남은 것 — 굿즈/상영 크론에도 기록 확장.
+- **보강(같은 날)**: per-run 카운트는 "이번에 새로 걷은 것"이라 평소 0이 정상인데 화면에 0만 보이면 "안 걷네"로 오해됨.
+  → `/api/batch-runs`에 **누적 수집량(INDIE 이벤트/상영) + 마지막 신규 수집 시각** 추가, 뷰 상단에 "수집 누적 · 이벤트 N · 상영 M · 마지막 신규 …" 표기. per-run은 "신규 N건"으로 명확히.
+  또 로컬 수집 Chrome 기동 하드닝(타임아웃 30→60s + 1회 재시도) — 절전복귀/부하 시 "WS endpoint Timed out" error 대응.
 
 ---
 
