@@ -18,6 +18,7 @@ interface MomoRow {
   ScreeningInfo?: string;
   RemainSeatCnt?: string;
   TotalSeatCnt?: string;
+  Url?: string; // 공식 포스터 이미지 URL (img.dtryx.com/poster/... — PosterGuID 해석본, 2026-08-08 발견)
 }
 
 function addDays(date: string, days: number): string {
@@ -65,6 +66,7 @@ async function fetchDate(date: string, theater: DtryxTheater): Promise<Collected
       remainingSeats: Number.isFinite(Number(row.RemainSeatCnt)) ? Number(row.RemainSeatCnt) : undefined,
       totalSeats: Number.isFinite(Number(row.TotalSeatCnt)) ? Number(row.TotalSeatCnt) : undefined,
       bookingUrl: theater.bookingUrl,
+      posterUrl: row.Url?.startsWith("http") ? row.Url : undefined, // 공식 포스터 (TMDB 미매칭작 폴백)
     }];
   });
 }
