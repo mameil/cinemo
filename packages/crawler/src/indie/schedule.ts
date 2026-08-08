@@ -12,6 +12,7 @@ import { collectDeosupScreenings } from "./deosup";
 import { collectEmuScreenings } from "./emu";
 import { collectFilmforumScreenings } from "./filmforum";
 import { collectIndiespaceScreenings } from "./indiespace";
+import { collectLaikaScreenings } from "./laika";
 import { collectMomoScreenings } from "./momo";
 import { collectSeoulArtCinemaScreenings } from "./seoulartcinema";
 
@@ -21,6 +22,7 @@ interface IndieSource {
 }
 
 const SOURCES: IndieSource[] = [
+  { label: "라이카시네마", collect: collectLaikaScreenings },
   { label: "아리랑시네센터", collect: collectArirangScreenings },
   { label: "씨네큐브", collect: collectCinecubeScreenings },
   { label: "더숲 아트시네마", collect: collectDeosupScreenings },
