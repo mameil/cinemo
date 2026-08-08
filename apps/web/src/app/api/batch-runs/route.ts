@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { db, crawlRuns } from "@cinemo/shared";
-import { desc } from "drizzle-orm";
+import { db, crawlRuns, events, screenings, rawPosts } from "@cinemo/shared";
+import { desc, eq, sql } from "drizzle-orm";
 import { withDbRetry } from "@/lib/db-retry";
 
 /** Turso 순간 단절 흡수 — 핸들러 전체 재시도 (읽기 전용이라 안전) */
@@ -36,8 +36,24 @@ async function handleGet() {
     return true;
   });
 
+  // 누적 수집량 + 마지막 신규 수집 시각 — per-run 0("신규 없음")이 "비어있음"으로 오해되지 않게.
+  const cnt = sql<number>`count(*)`;
+  const [[ev], [sc], [last]] = await Promise.all([
+    db.select({ c: cnt }).from(events).where(eq(events.chain, "INDIE")),
+    db.select({ c: cnt }).from(screenings).where(eq(screenings.chain, "INDIE")),
+    db
+      .select({ t: sql<string | null>`max(${rawPosts.createdAt})` })
+      .from(rawPosts)
+      .where(eq(rawPosts.source, "INSTA")),
+  ]);
+  const totals = {
+    indieEvents: ev?.c ?? 0,
+    indieScreenings: sc?.c ?? 0,
+    lastCollectedAt: last?.t ?? null, // 마지막으로 새 인스타 게시물을 담은 시각
+  };
+
   return NextResponse.json(
-    { runs, byMachine },
+    { runs, byMachine, totals },
     { headers: { "Cache-Control": "s-maxage=30, stale-while-revalidate=60" } }
   );
 }
