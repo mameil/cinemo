@@ -28,6 +28,16 @@ function stamp(iso: string): string {
   return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+const SOURCE_LABEL: Record<string, string> = {
+  "insta-local": "인스타(로컬)",
+  "insta-apify": "인스타(클라우드)",
+  goods: "굿즈/특전",
+  showtime: "상영시간표",
+};
+function sourceLabel(s: string): string {
+  return SOURCE_LABEL[s] ?? s;
+}
+
 /** 로컬 배치(두 PC) 실행 상태 — 헤더 버튼 → 드롭다운. crawl_runs를 /api/batch-runs로 조회. */
 interface Totals {
   indieEvents: number;
@@ -38,7 +48,7 @@ interface Totals {
 export default function BatchStatus() {
   const [open, setOpen] = useState(false);
   const [runs, setRuns] = useState<Run[] | null>(null);
-  const [byMachine, setByMachine] = useState<Run[]>([]);
+  const [summary, setSummary] = useState<Run[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -49,9 +59,9 @@ export default function BatchStatus() {
     try {
       const res = await fetch("/api/batch-runs");
       if (!res.ok) throw new Error(String(res.status));
-      const j = (await res.json()) as { runs: Run[]; byMachine: Run[]; totals: Totals };
+      const j = (await res.json()) as { runs: Run[]; summary: Run[]; totals: Totals };
       setRuns(j.runs);
-      setByMachine(j.byMachine);
+      setSummary(j.summary);
       setTotals(j.totals);
     } catch {
       setError(true);
@@ -118,11 +128,11 @@ export default function BatchStatus() {
 
           {runs !== null && runs.length > 0 && (
             <>
-              {/* 기계별 최신 요약 */}
+              {/* 소스별 최신 요약 (인스타-로컬은 PC별, 굿즈·상영은 소스별) */}
               <div className="space-y-1.5">
-                {byMachine.map((r) => (
+                {summary.map((r, i) => (
                   <div
-                    key={r.machine}
+                    key={i}
                     className="flex items-center gap-2 rounded-lg border border-line bg-ground/50 px-2.5 py-1.5"
                   >
                     <span
@@ -132,13 +142,17 @@ export default function BatchStatus() {
                     />
                     <div className="min-w-0">
                       <div className="truncate text-[12px] font-semibold text-ink">
-                        {r.machine}
+                        {sourceLabel(r.source)}
+                        {r.source === "insta-local" && (
+                          <span className="font-normal text-ink-3">
+                            {" · "}
+                            {r.machine.replace(/\.(local|[a-z]+\.co\.kr)$/, "")}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-[10.5px] text-ink-3">
-                        {r.source} · {ago(r.startedAt)}
-                        {r.status === "success"
-                          ? ` · 신규 ${(r.events ?? 0) + (r.screenings ?? 0)}건`
-                          : " · 실패"}
+                      <div className="truncate text-[10.5px] text-ink-3">
+                        {ago(r.startedAt)} ·{" "}
+                        {r.status === "success" ? r.detail ?? "정상" : "❗ 실패"}
                       </div>
                     </div>
                   </div>
@@ -157,8 +171,8 @@ export default function BatchStatus() {
                         }`}
                       />
                       <span className="flex-none tabular-nums text-ink-3">{stamp(r.startedAt)}</span>
-                      <span className="min-w-0 flex-1 truncate text-ink-2" title={r.detail ?? ""}>
-                        {r.machine.replace(/\.local$/, "")} · {r.detail ?? r.status}
+                      <span className="min-w-0 flex-1 truncate text-ink-2" title={`${r.machine} · ${r.detail ?? ""}`}>
+                        {sourceLabel(r.source)} · {r.detail ?? r.status}
                       </span>
                     </div>
                   ))}

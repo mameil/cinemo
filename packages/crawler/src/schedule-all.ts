@@ -16,7 +16,7 @@ import { collectLotteScreenings } from "./lotte/schedule";
 import { collectMegaboxScreenings } from "./megabox/schedule";
 import { collectCgvScreenings } from "./cgv/schedule";
 import { collectIndieScreenings } from "./indie/schedule";
-import { ingestScreenings, deletePastScreenings } from "./db/repo";
+import { ingestScreenings, deletePastScreenings, recordCrawlRun } from "./db/repo";
 import type { Chain, CollectedScreening } from "./domain";
 
 /** 오늘(KST) YYYY-MM-DD */
@@ -81,14 +81,17 @@ async function main() {
   console.log("========== 상영시간표 수집 시작 ==========");
   console.log(all ? "범위: 수도권 전체" : `범위: 구역(${only!.length}개 키워드) · ${days}일`);
 
+  const startedAt = new Date().toISOString();
   const summaryLines: string[] = [];
   const failures: string[] = [];
+  let totalScreenings = 0;
 
   for (const st of STAGES) {
     console.log(`\n--- ${st.label} ---`);
     try {
       const collected = await st.collect({ days, only });
       const stats = await ingestScreenings(st.chain, collected);
+      totalScreenings += stats.screenings;
       const skipNote = stats.skipped > 0 ? ` / ⚠️ 스킵 ${stats.skipped}` : "";
       const detail = `상영 ${stats.screenings} / 지점 ${stats.theaters} / 영화 ${stats.moviesLinked}${skipNote}`;
       console.log(`  ✅ ${st.label}: ${detail}`);
@@ -111,6 +114,18 @@ async function main() {
 
   console.log("\n========== 완료 ==========");
   writeJobSummary(summaryLines, failures.length);
+
+  await recordCrawlRun({
+    source: "showtime",
+    startedAt,
+    status: failures.length === 0 ? "success" : "error",
+    screenings: totalScreenings,
+    detail:
+      failures.length === 0
+        ? `상영 ${totalScreenings}회차 (${STAGES.length}사)`
+        : `실패: ${failures.join(", ")}`,
+  });
+
   return failures.length === 0;
 }
 

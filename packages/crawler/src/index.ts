@@ -19,7 +19,7 @@ import { appendFileSync } from "fs";
 import { collectCgv } from "./cgv/collect";
 import { collectLotte } from "./lotte/collect";
 import { collectMegabox } from "./megabox/collect";
-import { ingest } from "./db/repo";
+import { ingest, recordCrawlRun } from "./db/repo";
 import { backfill } from "./kobis-backfill";
 import { syncMovies } from "./tmdb-sync";
 import type { Chain, CollectedEvent } from "./domain";
@@ -128,6 +128,7 @@ async function main() {
   if (maxEvents) console.log(`(각 체인 최대 ${maxEvents}건)`);
   if (skipGeneral) console.log("(일반 이벤트 수집 생략 — 특전+재고만)");
 
+  const startedAt = new Date().toISOString();
   const results: StageResult[] = [];
 
   // 1) 체인별 수집 → 적재
@@ -171,6 +172,19 @@ async function main() {
   }
 
   writeJobSummary(results, failed);
+
+  // 실행 기록 (crawl_runs) — 배치 상태 뷰에 굿즈 크론도 노출. dev 빠른점검(--max)은 제외.
+  if (!maxEvents) {
+    await recordCrawlRun({
+      source: "goods",
+      startedAt,
+      status: failed === 0 ? "success" : "error",
+      detail:
+        failed === 0
+          ? `정상 (${results.length}단계${skipGeneral ? " · 경량" : ""})`
+          : `실패 ${failed}: ${failedResults.map((r) => r.stage).join(", ")}`,
+    });
+  }
 
   // 실패가 하나라도 있으면 비정상 종료 → GitHub Actions 실패 처리 + 알림
   return failed === 0;
