@@ -22,5 +22,5 @@ export const INDIE_THEATERS: IndieTheater[] = [
   { handle: "deosup_artcinema", theaterName: "더숲 아트시네마", region: "서울" },
   { handle: "arirang_cine", theaterName: "아리랑시네센터", region: "서울" },
   { handle: "kucinema", theaterName: "KU시네마테크", region: "서울" },
-  { handle: "artninecinema", theaterName: "아트나인", region: "서울" },
+  // 아트나인(artninecinema): 동작구라 커버 범위 밖 + Dtryx 아닌 TinyTicket이라 공식 소스도 없음 → 제외 (2026-08-09)
 ];
