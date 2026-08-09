@@ -19,7 +19,7 @@ import { copyImageToR2 } from "../lib/r2";
 import { assertApifyBudget } from "../lib/budget-guard";
 import { getParser, type ParsedGoodiePost } from "./parse";
 import { parseTimetable, noteToFormat } from "./timetable";
-import { INSTA_ACCOUNTS, type InstaAccount } from "./accounts";
+import { INSTA_ACCOUNTS, currentShard, shardAccounts, type InstaAccount } from "./accounts";
 
 const CONFIDENCE_THRESHOLD = 0.8;
 /** 시간표 추출 채택 최소 확신도 */
@@ -202,9 +202,18 @@ export async function collectInsta(opts: InstaCollectOptions = {}): Promise<Inst
     opts.fetcher ?? (process.env.INSTA_FETCHER === "local" ? "local" : "apify");
   if (fetcher === "apify") await assertApifyBudget(); // 로컬 수집은 Apify 크레딧 미사용
   const onlySet = opts.only?.length ? new Set(opts.only.map((h) => h.toLowerCase())) : null;
-  const accounts = INSTA_ACCOUNTS.filter(
+  let accounts = INSTA_ACCOUNTS.filter(
     (a) => a.enabled && (!onlySet || onlySet.has(a.handle.toLowerCase()))
   );
+  // 계정 분담: 로컬 정규 실행(비-dry·비-seed·비-only)은 이 기계의 shard만 수집 (IP 부하 분산).
+  if (fetcher === "local" && !opts.dry && !opts.seed && !onlySet) {
+    const shard = currentShard();
+    if (shard !== null) {
+      const before = accounts.length;
+      accounts = shardAccounts(accounts, shard);
+      console.log(`  계정 분담: shard ${shard} → ${accounts.length}/${before}계정`);
+    }
+  }
   if (!accounts.length) {
     console.log("  활성화된 인스타 계정 없음" + (onlySet ? " (--only 매치 없음)" : ""));
     return { events: [], screenings: [] };
