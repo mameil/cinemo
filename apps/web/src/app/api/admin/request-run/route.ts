@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, batchRequests } from "@cinemo/shared";
+import { requireAdmin } from "@/lib/admin-auth";
 
 /**
  * 로컬 배치 수동 실행 요청 — 어드민 버튼이 호출.
@@ -9,6 +10,9 @@ import { db, batchRequests } from "@cinemo/shared";
 const ALLOWED = new Set(["insta-local"]);
 
 export async function POST(req: Request) {
+  if (!requireAdmin(req)) {
+    return NextResponse.json({ error: "인증 필요" }, { status: 401 });
+  }
   const body = (await req.json().catch(() => ({}))) as { source?: string };
   const source = body.source ?? "insta-local";
   if (!ALLOWED.has(source)) {
