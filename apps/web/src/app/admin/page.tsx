@@ -188,10 +188,10 @@ export default function AdminPage() {
         <button
           onClick={requestRun}
           disabled={requesting || request?.pending}
-          className={`ml-auto flex-none rounded-full px-3 py-1.5 text-[12px] font-bold transition-colors ${
+          className={`ml-auto flex-none rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-50 ${
             request?.pending
-              ? "bg-app-tint text-app"
-              : "bg-app text-white hover:opacity-90 disabled:opacity-50"
+              ? "border-app bg-app-tint text-app"
+              : "border-line bg-panel text-ink-2 hover:border-app hover:text-app"
           }`}
         >
           {request?.pending ? "⏳ 요청 대기 중" : requesting ? "요청 중…" : "▶ 실행 요청"}
