@@ -59,6 +59,40 @@ export default function AdminPage() {
   const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
 
   const [requesting, setRequesting] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  // 어드민 쓰기: x-admin-secret 헤더(로컬 저장) 첨부. 401이면 비밀번호 물어보고 재시도.
+  async function adminPost(url: string, payload: unknown): Promise<Response> {
+    const send = (secret: string) =>
+      fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(secret ? { "x-admin-secret": secret } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+    let res = await send(localStorage.getItem("adminSecret") ?? "");
+    if (res.status === 401) {
+      const entered = window.prompt("관리 비밀번호 (ADMIN_SECRET)") ?? "";
+      if (entered) {
+        localStorage.setItem("adminSecret", entered);
+        res = await send(entered);
+      }
+    }
+    return res;
+  }
+
+  async function dispatchCloud(target: string, label: string) {
+    setMsg(`${label} 실행 요청 중…`);
+    try {
+      const res = await adminPost("/api/admin/dispatch", { target });
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      setMsg(res.ok ? `✅ ${label} 실행됨 — GitHub Actions에서 진행` : `❌ ${label}: ${j.error ?? res.status}`);
+    } catch {
+      setMsg(`❌ ${label} 실행 요청 실패`);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,11 +113,7 @@ export default function AdminPage() {
     if (requesting) return;
     setRequesting(true);
     try {
-      await fetch("/api/admin/request-run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: "insta-local" }),
-      });
+      await adminPost("/api/admin/request-run", { source: "insta-local" });
       await load();
     } catch {
       /* 무시 — 다음 새로고침에 반영 */
@@ -166,6 +196,29 @@ export default function AdminPage() {
         >
           {request?.pending ? "⏳ 요청 대기 중" : requesting ? "요청 중…" : "▶ 실행 요청"}
         </button>
+      </div>
+
+      {/* 클라우드 배치 수동 실행 (GitHub Actions workflow_dispatch) */}
+      <div className="mb-4 rounded-xl border border-line bg-white px-3 py-2.5">
+        <div className="text-[12.5px] font-semibold text-ink">클라우드 배치 · 수동 실행</div>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {[
+            { t: "showtime", l: "상영시간표" },
+            { t: "goods", l: "체인 굿즈" },
+            { t: "insta-apify", l: "인스타(Apify)" },
+          ].map((b) => (
+            <button
+              key={b.t}
+              onClick={() => dispatchCloud(b.t, b.l)}
+              className="rounded-full border border-line bg-panel px-3 py-1.5 text-[12px] font-semibold text-ink-2 hover:border-app hover:text-app transition-colors"
+            >
+              ▶ {b.l}
+            </button>
+          ))}
+        </div>
+        <div className="mt-1.5 text-[10.5px] text-ink-3">
+          {msg ?? "GitHub Actions를 즉시 실행합니다 (진행은 Actions 탭·아래 최신 상태에서)"}
+        </div>
       </div>
 
       {/* 소스/기계별 최신 상태 */}
