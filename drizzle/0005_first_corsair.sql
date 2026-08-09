@@ -1,0 +1,1 @@
+ALTER TABLE `batch_requests` ADD `machine` text;

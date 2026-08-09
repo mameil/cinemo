@@ -259,7 +259,7 @@ async function main() {
   // --poll: 어드민 수동 실행 요청 폴링(로컬 배치 전용, 5분 주기 스케줄러가 호출).
   // 이 기계의 마지막 insta-local 실행보다 새 요청이 있을 때만 수집한다(없으면 빠르게 종료).
   if (args.includes("--poll")) {
-    const reqAt = await latestRunRequestAt("insta-local");
+    const reqAt = await latestRunRequestAt("insta-local", hostname());
     if (!reqAt) {
       console.log("[poll] 실행 요청 없음 — 종료");
       return;

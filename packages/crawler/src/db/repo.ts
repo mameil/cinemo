@@ -28,7 +28,7 @@ import type {
   IngestStats,
   ScreeningStats,
 } from "../domain";
-import { lt, gte, and, eq, sql } from "drizzle-orm";
+import { lt, gte, and, or, eq, isNull, sql } from "drizzle-orm";
 import {
   classifyGoodieType,
   findOrCreateMovie,
@@ -140,12 +140,23 @@ export async function lastCrawlRunAt(
   return row?.t ?? null;
 }
 
-/** 특정 소스의 최신 실행 요청 시각 (어드민 버튼이 남긴 것). 없으면 null. */
-export async function latestRunRequestAt(source: string): Promise<string | null> {
+/**
+ * 이 기계에 유효한 최신 실행 요청 시각. machine이 비었거나(=전체) 이 기계 지정인 요청만.
+ * 폴러가 "내 마지막 실행보다 새 요청인지" 판단용. 없으면 null.
+ */
+export async function latestRunRequestAt(
+  source: string,
+  machine: string
+): Promise<string | null> {
   const [row] = await db
     .select({ t: sql<string>`max(${batchRequests.requestedAt})` })
     .from(batchRequests)
-    .where(eq(batchRequests.source, source));
+    .where(
+      and(
+        eq(batchRequests.source, source),
+        or(isNull(batchRequests.machine), eq(batchRequests.machine, machine))
+      )
+    );
   return row?.t ?? null;
 }
 
