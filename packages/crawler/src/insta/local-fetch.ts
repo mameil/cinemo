@@ -129,17 +129,17 @@ export async function fetchPostsLocal(
   let skippedSeen = 0;
 
   try {
-    const page = await browser.newPage();
-    await page.setUserAgent(UA);
-    // tsx(esbuild)는 keep-names로 함수에 `__name` 헬퍼 호출을 주입하는데, page.evaluate로
-    // 브라우저에 넘어간 함수 안에서 그 헬퍼가 없어 `__name is not defined`가 난다.
-    // 모든 문서에 no-op __name을 먼저 심어 무력화한다 (문자열이라 esbuild가 안 건드림).
-    await page.evaluateOnNewDocument(
-      "globalThis.__name = globalThis.__name || function (f) { return f; };"
-    );
-
     for (const handle of handles) {
+      // 계정마다 새 incognito context로 조회 — 인스타의 "같은 세션 2번째 프로필부터
+      // 로그인월(빈 그리드)" 현상을 우회한다 (2026-08-09 진단: 1계정만 되고 2계정부터 막힘).
+      const ctx = await browser.createBrowserContext();
       try {
+        const page = await ctx.newPage();
+        await page.setUserAgent(UA);
+        // tsx(esbuild) keep-names가 주입한 __name이 page.evaluate에서 미정의 → 문서마다 no-op 선주입.
+        await page.evaluateOnNewDocument(
+          "globalThis.__name = globalThis.__name || function (f) { return f; };"
+        );
         // ① 프로필 그리드 — 최신 게시물 링크 (고정 게시물 포함, Apify와 동일 순서)
         await page.goto(`https://www.instagram.com/${handle}/`, {
           waitUntil: "networkidle2",
@@ -241,6 +241,8 @@ export async function fetchPostsLocal(
         console.warn(
           `  ⚠️ [로컬] @${handle} 프로필 실패: ${(err as Error).message.slice(0, 80)}`
         );
+      } finally {
+        await ctx.close();
       }
     }
   } finally {
