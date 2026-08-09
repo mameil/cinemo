@@ -1,7 +1,7 @@
 #!/bin/sh
 # 인스타 로컬 수집 — macOS launchd 등록 (C안, 크로스플랫폼)
 #
-# 집 맥에서 1회 실행하면 "매시 정각 09~23시" 에이전트가 등록된다.
+# 집 맥에서 1회 실행하면 "하루 3회(10/15/20시)" 에이전트가 등록된다.
 # 윈도우의 작업 스케줄러(insta-local-setup.ps1)와 대칭. 재실행하면 교체(idempotent).
 # plist를 이 맥의 실제 경로로 생성하므로 클론 위치에 무관하다(두 맥 교대 대비).
 #
@@ -33,13 +33,11 @@ fi
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
 
-# 09~23시 매시 정각 트리거 생성
+# 하루 3회(10/15/20시) 트리거 — 인스타 IP 차단 완화(저빈도). 2026-08-09: 매시→3회로 축소.
 TRIGGERS=""
-h=9
-while [ "$h" -le 23 ]; do
+for h in 10 15 20; do
   TRIGGERS="$TRIGGERS        <dict><key>Hour</key><integer>$h</integer><key>Minute</key><integer>0</integer></dict>
 "
-  h=$((h + 1))
 done
 
 cat > "$PLIST" <<EOF
@@ -63,6 +61,6 @@ plutil -lint "$PLIST" >/dev/null
 launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST"
 
-echo "등록 완료: $LABEL (매시 정각 09~23시)"
+echo "등록 완료: $LABEL (하루 3회(10/15/20시))"
 echo "즉시 1회 실행:  launchctl start $LABEL"
 echo "로그:           $HOME/Library/Logs/cinemo-insta-local.log"

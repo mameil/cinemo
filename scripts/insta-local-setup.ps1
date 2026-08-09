@@ -1,6 +1,6 @@
 # 인스타 로컬 수집 — Windows 작업 스케줄러 등록 (C안, 크로스플랫폼)
 #
-# 회사 윈도우 데스크탑에서 1회 실행하면 "매시 정각 09~23시" 작업이 등록된다.
+# 회사 윈도우 데스크탑에서 1회 실행하면 "하루 3회(10/15/20시)" 작업이 등록된다.
 # 맥의 launchd(insta-local-setup.sh)와 대칭. 재실행하면 기존 작업을 교체(idempotent).
 #
 #   실행:  powershell -ExecutionPolicy Bypass -File scripts\insta-local-setup.ps1
@@ -43,8 +43,8 @@ if (-not $chrome) {
     Write-Host "Chrome: $chrome"
 }
 
-# 09~23시 매시 정각 트리거 15개 (맥 launchd StartCalendarInterval과 동일)
-$triggers = 9..23 | ForEach-Object {
+# 하루 3회(10/15/20시) 트리거 — 인스타 IP 차단 완화(저빈도). 2026-08-09: 매시→3회로 축소.
+$triggers = @(10, 15, 20) | ForEach-Object {
     New-ScheduledTaskTrigger -Daily -At ([datetime]::Today.AddHours($_))
 }
 # cmd.exe /c "<wrapper>" 로 래퍼 실행
@@ -62,9 +62,9 @@ if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
 }
 Register-ScheduledTask -TaskName $TaskName -Trigger $triggers -Action $action `
     -Settings $settings -Principal $principal `
-    -Description "cinemo 인스타 로컬 수집 (매시 정각 09~23시, Apify 대체)" | Out-Null
+    -Description "cinemo 인스타 로컬 수집 (하루 3회(10/15/20시), Apify 대체)" | Out-Null
 
 Write-Host ""
-Write-Host "등록 완료: $TaskName (매시 정각 09~23시)"
+Write-Host "등록 완료: $TaskName (하루 3회(10/15/20시))"
 Write-Host "즉시 1회 실행:  Start-ScheduledTask -TaskName $TaskName"
 Write-Host "로그:           $env:LOCALAPPDATA\cinemo-insta-local.log"
