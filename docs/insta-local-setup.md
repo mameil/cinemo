@@ -15,7 +15,7 @@
 3. **Google Chrome 설치** (puppeteer-core가 시스템 Chrome을 구동). 표준 경로에 없으면 `CHROME_BIN` 환경변수로 지정.
 4. Node.js + pnpm (PATH에 있어야 함).
 
-스케줄: **매시 정각 09~23시**. PC가 자고 있었으면 깨어난 뒤 밀린 슬롯을 1회 실행.
+스케줄: **하루 3회(10/15/20시)**. PC가 자고 있었으면 깨어난 뒤 밀린 슬롯을 1회 실행.
 새 게시물이 없는 대부분의 실행은 그리드 dedup으로 프로필만 조회하고 끝난다(저부하).
 
 ---
@@ -45,7 +45,7 @@ PowerShell에서:
 powershell -ExecutionPolicy Bypass -File scripts\insta-local-setup.ps1
 ```
 
-이게 `cinemo-insta-local` 작업을 매시 정각 09~23시로 등록한다(현재 로그인 사용자 컨텍스트).
+이게 `cinemo-insta-local` 작업을 하루 3회(10/15/20시)로 등록한다(현재 로그인 사용자 컨텍스트).
 
 | 작업 | 명령 |
 |---|---|

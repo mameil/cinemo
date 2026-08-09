@@ -42,9 +42,9 @@ function resolveChrome(): string {
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36";
 
-/** 게시물 간 대기 (봇 탐지 완화 — 무로그인 저속 원칙, 2~4초) */
+/** 게시물 간 대기 (봇 탐지 완화 — 무로그인 저속 원칙, 4~8초) */
 function pace(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 2000 + Math.random() * 2000));
+  return new Promise((r) => setTimeout(r, 4000 + Math.random() * 4000));
 }
 
 /** 인스타 shortCode(base64url) → 숫자 media ID (Apify id와 동일 포맷) */
@@ -157,6 +157,12 @@ export async function fetchPostsLocal(
         if (!targets.length) {
           emptyAccounts++;
           console.warn(`  ⚠️ [로컬] @${handle} 게시물 링크 0개 (로그인월/차단 가능성)`);
+          // 조기 중단: 아직 아무것도 못 걷었는데 연속 3계정이 비면 IP 차단으로 보고 중단한다.
+          // 나머지 계정을 더 긁어 차단을 악화시키지 않기 위함 (2026-08-09).
+          if (posts.length === 0 && emptyAccounts >= 3) {
+            console.warn(`  ⛔ [로컬] 연속 ${emptyAccounts}계정 차단 감지 — 남은 계정 스킵(조기 중단)`);
+            break;
+          }
           continue;
         }
 
