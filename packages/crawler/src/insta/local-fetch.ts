@@ -127,6 +127,7 @@ export async function fetchPostsLocal(
   const posts: ApifyPost[] = [];
   let emptyAccounts = 0;
   let skippedSeen = 0;
+  let blocked = false; // 조기중단(연속 빈 계정) = 차단 신호 → fail-loud로 error 처리
 
   try {
     for (const handle of handles) {
@@ -161,6 +162,7 @@ export async function fetchPostsLocal(
           // 나머지 계정을 더 긁어 차단을 악화시키지 않기 위함 (2026-08-09).
           if (posts.length === 0 && emptyAccounts >= 3) {
             console.warn(`  ⛔ [로컬] 연속 ${emptyAccounts}계정 차단 감지 — 남은 계정 스킵(조기 중단)`);
+            blocked = true;
             break;
           }
           continue;
@@ -256,9 +258,9 @@ export async function fetchPostsLocal(
   // fail-loud: "새 게시물이 없어 0건"(정상)과 "차단당해 0건"(사고)을 구분한다.
   // 그리드 링크를 준 계정이 하나도 없으면(=전 계정 프로필 접근 실패) 익명 차단 신호로 보고 throw.
   // 그리드는 읽혔는데 전부 기처리라 posts가 비는 건 정상 — 그대로 빈 배열 반환.
-  if (handles.length > 0 && emptyAccounts === handles.length) {
+  if (handles.length > 0 && (blocked || emptyAccounts === handles.length)) {
     throw new Error(
-      `로컬 인스타 수집 — 전 계정(${handles.length}) 프로필 접근 실패. ` +
+      `로컬 인스타 수집 — 프로필 접근 실패(빈 계정 ${emptyAccounts}${blocked ? ", 조기중단" : ""}). ` +
         `익명 접근 차단 가능성. Apify 폴백(workflow_dispatch --max=2)을 사용할 것`
     );
   }

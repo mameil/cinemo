@@ -17,6 +17,7 @@ import {
   rawPosts,
   screenings,
   crawlRuns,
+  batchRequests,
 } from "@cinemo/shared";
 import type {
   Chain,
@@ -123,6 +124,29 @@ export async function recordCrawlRun(run: {
   } catch (e) {
     console.error(`  ⚠️ crawl_runs 기록 실패: ${(e as Error).message.slice(0, 100)}`);
   }
+}
+
+/**
+ * 이 기계의 특정 소스 마지막 실행 시각(started_at). 폴러가 "새 요청인지" 판단용.
+ */
+export async function lastCrawlRunAt(
+  source: string,
+  machine: string
+): Promise<string | null> {
+  const [row] = await db
+    .select({ t: sql<string>`max(${crawlRuns.startedAt})` })
+    .from(crawlRuns)
+    .where(and(eq(crawlRuns.source, source), eq(crawlRuns.machine, machine)));
+  return row?.t ?? null;
+}
+
+/** 특정 소스의 최신 실행 요청 시각 (어드민 버튼이 남긴 것). 없으면 null. */
+export async function latestRunRequestAt(source: string): Promise<string | null> {
+  const [row] = await db
+    .select({ t: sql<string>`max(${batchRequests.requestedAt})` })
+    .from(batchRequests)
+    .where(eq(batchRequests.source, source));
+  return row?.t ?? null;
 }
 
 /**

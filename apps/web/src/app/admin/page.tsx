@@ -17,10 +17,16 @@ interface Totals {
   indieScreenings: number;
   lastCollectedAt: string | null;
 }
+interface RunRequest {
+  source: string;
+  requestedAt: string | null;
+  pending: boolean;
+}
 interface Payload {
   runs: Run[];
   summary: Run[];
   totals: Totals;
+  request?: RunRequest;
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -52,6 +58,8 @@ export default function AdminPage() {
   const [error, setError] = useState(false);
   const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
 
+  const [requesting, setRequesting] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
@@ -67,6 +75,23 @@ export default function AdminPage() {
     }
   }, []);
 
+  async function requestRun() {
+    if (requesting) return;
+    setRequesting(true);
+    try {
+      await fetch("/api/admin/request-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "insta-local" }),
+      });
+      await load();
+    } catch {
+      /* 무시 — 다음 새로고침에 반영 */
+    } finally {
+      setRequesting(false);
+    }
+  }
+
   useEffect(() => {
     document.title = "배치 현황 · cinemo admin";
     load();
@@ -77,6 +102,7 @@ export default function AdminPage() {
   const runs = data?.runs ?? [];
   const summary = data?.summary ?? [];
   const totals = data?.totals;
+  const request = data?.request;
   const errorCount = runs.filter((r) => r.status === "error").length;
 
   return (
@@ -118,6 +144,29 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* 로컬 배치 수동 실행 (요청 플래그 → 각 PC 폴러가 5분 내 처리) */}
+      <div className="mb-4 flex items-center gap-3 rounded-xl border border-line bg-white px-3 py-2.5">
+        <div className="min-w-0">
+          <div className="text-[12.5px] font-semibold text-ink">인스타 로컬 수집 · 수동 실행</div>
+          <div className="text-[10.5px] text-ink-3">
+            {request?.pending
+              ? `요청됨 ${request.requestedAt ? ago(request.requestedAt) : ""} · 각 PC 폴러가 5분 내 수집`
+              : "누르면 각 PC(집·회사)가 5분 내 수집을 시작합니다"}
+          </div>
+        </div>
+        <button
+          onClick={requestRun}
+          disabled={requesting || request?.pending}
+          className={`ml-auto flex-none rounded-full px-3 py-1.5 text-[12px] font-bold transition-colors ${
+            request?.pending
+              ? "bg-app-tint text-app"
+              : "bg-app text-white hover:opacity-90 disabled:opacity-50"
+          }`}
+        >
+          {request?.pending ? "⏳ 요청 대기 중" : requesting ? "요청 중…" : "▶ 실행 요청"}
+        </button>
+      </div>
 
       {/* 소스/기계별 최신 상태 */}
       <h2 className="mb-2 text-[12px] font-bold text-ink-2">소스별 최신 상태</h2>

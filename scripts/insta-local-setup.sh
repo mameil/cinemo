@@ -61,6 +61,28 @@ plutil -lint "$PLIST" >/dev/null
 launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST"
 
-echo "등록 완료: $LABEL (하루 3회(10/15/20시))"
+# ── 폴러 에이전트: 5분마다 어드민 실행 요청 확인 (요청 있을 때만 수집) ──
+POLL_LABEL="com.cinemo.insta-poll"
+POLL_PLIST="$HOME/Library/LaunchAgents/$POLL_LABEL.plist"
+cat > "$POLL_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>$POLL_LABEL</string>
+    <key>ProgramArguments</key>
+    <array><string>/bin/sh</string><string>$WRAPPER</string></array>
+    <key>EnvironmentVariables</key><dict><key>INSTA_POLL</key><string>1</string></dict>
+    <key>StartInterval</key><integer>300</integer>
+    <key>RunAtLoad</key><false/>
+    <key>StandardOutPath</key><string>$LAUNCHD_LOG</string>
+    <key>StandardErrorPath</key><string>$LAUNCHD_LOG</string>
+</dict>
+</plist>
+EOF
+plutil -lint "$POLL_PLIST" >/dev/null
+launchctl unload "$POLL_PLIST" 2>/dev/null || true
+launchctl load "$POLL_PLIST"
+
+echo "등록 완료: $LABEL (하루 3회(10/15/20시)) + $POLL_LABEL (5분 폴링)"
 echo "즉시 1회 실행:  launchctl start $LABEL"
 echo "로그:           $HOME/Library/Logs/cinemo-insta-local.log"

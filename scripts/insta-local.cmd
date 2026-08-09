@@ -19,11 +19,15 @@ rem pnpm insta 스크립트는 POSIX 인라인 env(VAR=val cmd)라 Windows에서
 rem 대신 절대경로 .env를 지정하고 tsx를 pnpm exec로 직접 호출한다(cwd 무관).
 set "DOTENV_CONFIG_PATH=%REPO_ROOT%\.env"
 
-echo ===== %date% %time% 인스타 로컬 수집 시작 (max=%INSTA_MAX%) ===== >> "%LOG%"
+rem 폴 모드: 어드민 실행 요청 있을 때만 수집. 5분 폴러가 INSTA_POLL=1로 호출.
+set "POLL_ARG="
+if "%INSTA_POLL%"=="1" set "POLL_ARG=--poll"
+
+echo ===== %date% %time% 인스타 로컬 수집 시작 (max=%INSTA_MAX% %POLL_ARG%) ===== >> "%LOG%"
 
 cd /d "%REPO_ROOT%" || (echo 레포 루트 진입 실패: %REPO_ROOT% >> "%LOG%" & exit /b 1)
 
-call pnpm --filter @cinemo/crawler exec tsx --require dotenv/config src/insta/index.ts -- --local --max=%INSTA_MAX% >> "%LOG%" 2>&1
+call pnpm --filter @cinemo/crawler exec tsx --require dotenv/config src/insta/index.ts -- --local --max=%INSTA_MAX% %POLL_ARG% >> "%LOG%" 2>&1
 set "STATUS=%ERRORLEVEL%"
 
 echo ===== %date% %time% 종료 (exit %STATUS%) ===== >> "%LOG%"
