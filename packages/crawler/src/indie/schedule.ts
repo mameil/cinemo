@@ -25,8 +25,7 @@ interface IndieSource {
 
 const SOURCES: IndieSource[] = [
   { label: "라이카시네마", collect: collectLaikaScreenings },
-  // 아트나인: indieart/000069는 에무 코드였음(버그). 아트나인은 TinyTicket이라 Dtryx에 없음.
-  // TinyTicket 조사 후 이관 예정 — 그때까지 상영 소스 없음. (docs/배치-아키텍처.md)
+  // 아트나인: 동작구라 커버 범위 밖 → 추적 제외(2026-08-09, INDIE_THEATERS에서 삭제).
   { label: "KT&G 상상마당 시네마", collect: collectSangsangScreenings },
   { label: "KU시네마테크", collect: collectKuScreenings },
   { label: "아리랑시네센터", collect: collectArirangScreenings },
