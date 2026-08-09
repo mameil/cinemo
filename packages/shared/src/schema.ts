@@ -211,6 +211,7 @@ export const crawlRuns = sqliteTable(
 export const batchRequests = sqliteTable("batch_requests", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   source: text("source").notNull(), // insta-local | goods | showtime
+  machine: text("machine"), // null=전체 PC, 값=그 기계(hostname)만 처리
   requestedAt: text("requested_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),

@@ -13,12 +13,20 @@ export async function POST(req: Request) {
   if (!requireAdmin(req)) {
     return NextResponse.json({ error: "인증 필요" }, { status: 401 });
   }
-  const body = (await req.json().catch(() => ({}))) as { source?: string };
+  const body = (await req.json().catch(() => ({}))) as {
+    source?: string;
+    machine?: string;
+  };
   const source = body.source ?? "insta-local";
   if (!ALLOWED.has(source)) {
     return NextResponse.json({ error: "허용되지 않은 source" }, { status: 400 });
   }
+  // machine 지정 시 그 기계만, 없으면 전체 PC. 과한 값 방어(길이 제한).
+  const machine =
+    typeof body.machine === "string" && body.machine.length <= 100
+      ? body.machine
+      : null;
   const requestedAt = new Date().toISOString();
-  await db.insert(batchRequests).values({ source, requestedAt });
-  return NextResponse.json({ ok: true, source, requestedAt });
+  await db.insert(batchRequests).values({ source, machine, requestedAt });
+  return NextResponse.json({ ok: true, source, machine, requestedAt });
 }

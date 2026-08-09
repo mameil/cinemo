@@ -11,6 +11,7 @@ interface Run {
   events: number | null;
   screenings: number | null;
   detail: string | null;
+  pending?: boolean; // 이 기계에 실행 요청 대기 중
 }
 interface Totals {
   indieEvents: number;
@@ -109,11 +110,11 @@ export default function AdminPage() {
     }
   }, []);
 
-  async function requestRun() {
+  async function requestRun(machine?: string) {
     if (requesting) return;
     setRequesting(true);
     try {
-      await adminPost("/api/admin/request-run", { source: "insta-local" });
+      await adminPost("/api/admin/request-run", { source: "insta-local", machine });
       await load();
     } catch {
       /* 무시 — 다음 새로고침에 반영 */
@@ -186,7 +187,7 @@ export default function AdminPage() {
           </div>
         </div>
         <button
-          onClick={requestRun}
+          onClick={() => requestRun()}
           disabled={requesting || request?.pending}
           className={`ml-auto flex-none rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-50 ${
             request?.pending
@@ -194,7 +195,7 @@ export default function AdminPage() {
               : "border-line bg-panel text-ink-2 hover:border-app hover:text-app"
           }`}
         >
-          {request?.pending ? "⏳ 요청 대기 중" : requesting ? "요청 중…" : "▶ 실행 요청"}
+          {request?.pending ? "⏳ 전체 대기 중" : requesting ? "요청 중…" : "▶ 전체 실행"}
         </button>
       </div>
 
@@ -242,6 +243,20 @@ export default function AdminPage() {
                 <span className="text-[11px] font-normal text-ink-3">{shortMachine(r.machine)}</span>
               )}
               <span className="ml-auto text-[10.5px] text-ink-3">{ago(r.startedAt)}</span>
+              {/* insta-local 기계별 개별 재실행 */}
+              {r.source === "insta-local" && (
+                <button
+                  onClick={() => requestRun(r.machine)}
+                  disabled={requesting || r.pending}
+                  className={`flex-none rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50 ${
+                    r.pending
+                      ? "border-app bg-app-tint text-app"
+                      : "border-line bg-panel text-ink-2 hover:border-app hover:text-app"
+                  }`}
+                >
+                  {r.pending ? "⏳ 대기" : "↻ 재실행"}
+                </button>
+              )}
             </div>
             <div
               className={`mt-1 truncate text-[11.5px] ${
