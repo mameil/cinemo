@@ -64,7 +64,23 @@ Register-ScheduledTask -TaskName $TaskName -Trigger $triggers -Action $action `
     -Settings $settings -Principal $principal `
     -Description "cinemo 인스타 로컬 수집 (하루 3회(10/15/20시), Apify 대체)" | Out-Null
 
+# ── 폴러 작업: 5분마다 어드민 실행 요청 확인 (요청 있을 때만 수집) ──
+$PollTaskName = "cinemo-insta-poll"
+# INSTA_POLL=1 로 래퍼 실행 (요청 없으면 즉시 종료)
+$pollAction = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" `
+    -Argument "/c set INSTA_POLL=1 & `"$Wrapper`""
+# -Once + 5분 반복, 기간 미지정(=무기한). Repetition 복사 트릭.
+$pollTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date)
+$pollTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) `
+    -RepetitionInterval (New-TimeSpan -Minutes 5)).Repetition
+if (Get-ScheduledTask -TaskName $PollTaskName -ErrorAction SilentlyContinue) {
+    Unregister-ScheduledTask -TaskName $PollTaskName -Confirm:$false
+}
+Register-ScheduledTask -TaskName $PollTaskName -Trigger $pollTrigger -Action $pollAction `
+    -Settings $settings -Principal $principal `
+    -Description "cinemo 인스타 로컬 수집 폴러 (5분마다 실행 요청 확인)" | Out-Null
+
 Write-Host ""
-Write-Host "등록 완료: $TaskName (하루 3회(10/15/20시))"
+Write-Host "등록 완료: $TaskName (하루 3회) + $PollTaskName (5분 폴링)"
 Write-Host "즉시 1회 실행:  Start-ScheduledTask -TaskName $TaskName"
 Write-Host "로그:           $env:LOCALAPPDATA\cinemo-insta-local.log"

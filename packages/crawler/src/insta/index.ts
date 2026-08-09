@@ -12,7 +12,15 @@
  */
 
 import { collectInsta, buildEvents, fetchPosts, type ApifyPost } from "./collect";
-import { ingest, ingestScreenings, upsertTheater, recordCrawlRun } from "../db/repo";
+import { hostname } from "os";
+import {
+  ingest,
+  ingestScreenings,
+  upsertTheater,
+  recordCrawlRun,
+  latestRunRequestAt,
+  lastCrawlRunAt,
+} from "../db/repo";
 import { parseTimetable, noteToFormat } from "./timetable";
 import type { ParsedGoodiePost } from "./parse";
 import { INSTA_ACCOUNTS } from "./accounts";
@@ -244,9 +252,26 @@ async function main() {
   const only = onlyArg ? onlyArg.split("=")[1].split(",").filter(Boolean) : undefined;
   // 수집 경로: --local(집 맥 Chrome, Apify 크레딧 미사용) / 기본 Apify.
   // env INSTA_FETCHER=local 로도 지정됨 (launchd에서 사용).
-  const fetcher: "apify" | "local" | undefined = args.includes("--local")
+  let fetcher: "apify" | "local" | undefined = args.includes("--local")
     ? "local"
     : undefined;
+
+  // --poll: 어드민 수동 실행 요청 폴링(로컬 배치 전용, 5분 주기 스케줄러가 호출).
+  // 이 기계의 마지막 insta-local 실행보다 새 요청이 있을 때만 수집한다(없으면 빠르게 종료).
+  if (args.includes("--poll")) {
+    const reqAt = await latestRunRequestAt("insta-local");
+    if (!reqAt) {
+      console.log("[poll] 실행 요청 없음 — 종료");
+      return;
+    }
+    const lastRun = await lastCrawlRunAt("insta-local", hostname());
+    if (lastRun && lastRun >= reqAt) {
+      console.log(`[poll] 이미 처리됨(요청 ${reqAt} ≤ 마지막 실행 ${lastRun}) — 종료`);
+      return;
+    }
+    console.log(`[poll] 실행 요청 감지(${reqAt}) — 로컬 수집 시작`);
+    fetcher = "local";
+  }
 
   // 게시물·특전·상영 회차가 아직 없는 관도 웹 필터에서 안정적인 ID로 표시되도록
   // 매 실행 시 v1 대상 12관을 먼저 등록한다.

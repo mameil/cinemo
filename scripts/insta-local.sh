@@ -7,8 +7,13 @@
 #
 # 수동 실행:   sh scripts/insta-local.sh
 # 캐치업:      INSTA_MAX=10 sh scripts/insta-local.sh
+# 폴링(요청 시만): INSTA_POLL=1 sh scripts/insta-local.sh  (5분 주기 스케줄러가 호출)
 # 로그:        ~/Library/Logs/cinemo-insta-local.log
 set -u
+
+# 폴 모드: 어드민 실행 요청이 있을 때만 수집(없으면 즉시 종료). 5분 폴러가 INSTA_POLL=1로 호출.
+POLL_ARG=""
+[ "${INSTA_POLL:-}" = "1" ] && POLL_ARG="--poll"
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
@@ -19,12 +24,12 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 LOG="$HOME/Library/Logs/cinemo-insta-local.log"
 mkdir -p "$(dirname "$LOG")"
 
-echo "===== $(date '+%Y-%m-%d %H:%M:%S') 인스타 로컬 수집 시작 (max=${INSTA_MAX:-2}) =====" >> "$LOG"
+echo "===== $(date '+%Y-%m-%d %H:%M:%S') 인스타 로컬 수집 시작 (max=${INSTA_MAX:-2}${POLL_ARG:+ · poll}) =====" >> "$LOG"
 
 cd "$REPO_ROOT" || { echo "레포 루트 진입 실패: $REPO_ROOT" >> "$LOG"; exit 1; }
 
 # --local: 집 맥 Chrome으로 무로그인 수집. .env는 pnpm insta 스크립트가 ../../.env로 로드.
-pnpm --filter @cinemo/crawler insta -- --local --max="${INSTA_MAX:-2}" >> "$LOG" 2>&1
+pnpm --filter @cinemo/crawler insta -- --local --max="${INSTA_MAX:-2}" $POLL_ARG >> "$LOG" 2>&1
 STATUS=$?
 
 echo "===== $(date '+%Y-%m-%d %H:%M:%S') 종료 (exit $STATUS) =====" >> "$LOG"

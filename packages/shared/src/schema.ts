@@ -204,3 +204,14 @@ export const crawlRuns = sqliteTable(
   },
   (t) => [index("crawl_runs_started_idx").on(t.startedAt)]
 );
+
+// ── 배치 실행 요청 (어드민 수동 트리거) ───────────
+// 어드민 버튼이 여기 한 줄 남기면, 각 기계의 폴러가 "내 마지막 실행보다 새 요청이면 수집"한다.
+// (append-only. 기계별 self-serve라 done 플래그 불필요 — crawl_runs의 마지막 실행 시각과 비교.)
+export const batchRequests = sqliteTable("batch_requests", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  source: text("source").notNull(), // insta-local | goods | showtime
+  requestedAt: text("requested_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
