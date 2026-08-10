@@ -190,7 +190,7 @@ export default function DiscoverHome() {
               <b className="mt-2 block text-sm">영화로</b>
               <small className="text-[10px] text-ink-3">포스터부터 보기</small>
             </Link>
-            <Link href={`/movies?date=${selectedDate}&open=theaters`} className="rounded-2xl border border-line bg-panel p-3 transition-colors hover:border-app">
+            <Link href={`/theaters?date=${selectedDate}`} className="rounded-2xl border border-line bg-panel p-3 transition-colors hover:border-app">
               <span className="text-xl">🏠</span>
               <b className="mt-2 block text-sm">극장으로</b>
               <small className="text-[10px] text-ink-3">자주 가는 곳 보기</small>
@@ -274,7 +274,7 @@ export default function DiscoverHome() {
                   <h2 className="text-base font-extrabold">독립영화관 시간표</h2>
                   <p className="text-[11px] text-ink-3">오늘 일정이 있는 독립영화관을 모았어요</p>
                 </div>
-                <Link href={`/movies?date=${selectedDate}&open=theaters`} className="text-xs font-bold text-app">전체 보기 →</Link>
+                <Link href={`/theaters?date=${selectedDate}`} className="text-xs font-bold text-app">전체 보기 →</Link>
               </div>
               <div className="overflow-hidden rounded-2xl border border-line bg-panel">
                 {indieTheaters.map((group) => (

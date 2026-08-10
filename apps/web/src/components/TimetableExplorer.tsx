@@ -98,6 +98,11 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     if (requestedQuery) setQueryMovie(requestedQuery);
     if (Number.isInteger(requestedTheater) && requestedTheater > 0) {
       setDirectTheaterId(requestedTheater);
+      // 극장 화면에서 한 곳을 명시해 들어온 경우 과거에 저장한 숨김 필터보다
+      // 직접 선택을 우선한다. 그렇지 않으면 선택한 극장이 빈 화면으로 보일 수 있다.
+      setExcludedTheaters(new Set());
+      setExcludedChains(new Set());
+      setExcludedMovies(new Set());
     }
     setInitialized(true);
   }, [defaultView]);
