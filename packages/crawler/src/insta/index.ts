@@ -357,9 +357,19 @@ async function main() {
   }
 }
 
+// 종료 처리: 즉시 process.exit() 하면 윈도우에서 libsql 핸들이 닫히는 중에 죽으면서
+// `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` 로 abort(0xC0000409)한다.
+// --poll 처럼 수 초 만에 끝나는 경로에서 100% 재현 → 5분 폴러가 매번 실패로 보였다.
+// 그래서 기본은 자연 종료에 맡기고, 무언가(Chrome 등)가 루프를 붙잡고 있을 때만
+// unref 타이머로 강제 종료한다(타이머 자체는 루프를 살려두지 않음).
+function finish(code: number) {
+  process.exitCode = code;
+  setTimeout(() => process.exit(code), 5000).unref();
+}
+
 main()
-  .then(() => process.exit(0))
+  .then(() => finish(0))
   .catch((err) => {
     console.error(err);
-    process.exit(1);
+    finish(1);
   });

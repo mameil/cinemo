@@ -31,6 +31,11 @@
     설치 `insta-local-setup.{sh,ps1}`(맥 launchd / 윈도우 작업 스케줄러, 둘 다 매시 09~23시·idempotent), Chrome 경로 OS 자동 감지.
     "새 PC에서 레포 풀 → Claude에게 **'인스타 로컬 배치 걸어줘'** → OS 감지해 setup 실행"을 CLAUDE.md·[insta-local-setup.md](insta-local-setup.md)에 박제.
     윈도우 함정: pnpm 스크립트의 POSIX 인라인 env(`VAR=val cmd`)가 안 먹음 → 래퍼가 절대경로 `DOTENV_CONFIG_PATH` 설정 후 `pnpm exec tsx` 직접 호출.
+  - **윈도우 실전 3종 함정 (2026-08-10, 회사 데탑 재설치)**: 설치 스크립트를 실제로 돌려보고서야 드러난 것들.
+    ① **`.ps1`은 UTF-8 BOM 필수** — 한글 주석이 든 스크립트를 Windows PowerShell 5.1이 ANSI(CP949)로 읽어, 깨진 멀티바이트가 뒤따르는 `"`를 삼킴 → 문자열 미종료 파싱 에러. pwsh(7)에선 안 나므로 맥/최신 환경에선 보이지 않는다.
+    ② **cmd `set VAR=1 & ...` 는 값에 뒤 공백이 붙는다** — 스케줄러 액션이 `INSTA_POLL="1 "`을 넘겨 래퍼의 `=="1"` 비교가 빗나감 → `--poll` 누락 → **폴러가 5분마다 풀 수집**. 로그엔 exit 0으로 찍혀 조용히 진행되는 사고. `set "VAR=1"`로 감싸고, 래퍼는 값 비교 대신 `if defined`로 이중 방어.
+    ③ **`process.exit(0)` 즉시 호출이 윈도우에서 abort** — libsql 핸들이 닫히는 중 죽으며 `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`(0xC0000409). 수 초 만에 끝나는 `--poll` 경로에서 100% 재현(길게 도는 본 수집은 우연히 통과). 자연 종료에 맡기고 unref 타이머로만 강제 종료. 같은 패턴이 크롤러 진입점 9곳에 남아 있음(현재 무증상).
+    교훈: **크로스플랫폼 대칭은 "짝 파일을 만들었다"로 끝나지 않는다 — 그 OS에서 한 번은 실제로 돌려봐야 한다.**
 
 ## 프로젝트 규칙으로 이관 (하네스 아님 — 도메인 스펙)
 

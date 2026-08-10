@@ -20,8 +20,9 @@ rem 대신 절대경로 .env를 지정하고 tsx를 pnpm exec로 직접 호출�
 set "DOTENV_CONFIG_PATH=%REPO_ROOT%\.env"
 
 rem 폴 모드: 어드민 실행 요청 있을 때만 수집. 5분 폴러가 INSTA_POLL=1로 호출.
+rem `set INSTA_POLL=1 & ...` 는 값에 뒤 공백이 붙으므로 값 비교 대신 defined 로 판정.
 set "POLL_ARG="
-if "%INSTA_POLL%"=="1" set "POLL_ARG=--poll"
+if defined INSTA_POLL set "POLL_ARG=--poll"
 
 echo ===== %date% %time% 인스타 로컬 수집 시작 (max=%INSTA_MAX% %POLL_ARG%) ===== >> "%LOG%"
 

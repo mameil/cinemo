@@ -85,3 +85,6 @@ powershell -ExecutionPolicy Bypass -File scripts\insta-local-setup.ps1
 - **`Chrome ... not found` / 실행 실패** → Chrome 미설치거나 비표준 경로. `CHROME_BIN`으로 실행 파일 경로 지정.
 - **로그에 `전 계정 프로필 접근 실패`** → 인스타가 익명 접근을 조인 신호. Apify 폴백(`insta.yml` `workflow_dispatch`)으로 임시 수집.
 - **`pnpm`/`node` 없음(윈도우 스케줄러)** → 작업이 사용자 PATH를 못 볼 때. 사용자 로그인 상태에서 실행되는지, Node/pnpm이 사용자 PATH에 있는지 확인.
+- **`.ps1` 실행이 `string is missing the terminator` / `ampersand not allowed`로 실패** → BOM 없는 UTF-8. PowerShell 5.1이 ANSI로 읽어 한글이 깨지며 따옴표를 삼킨 것. 파일에 UTF-8 BOM 추가로 해결.
+- **폴러가 매번 풀 수집을 돈다** → 로그 헤더에 `--poll`이 붙었는지 확인. 없으면 작업 액션의 `set "INSTA_POLL=1"` 따옴표 누락.
+- **`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` / exit 3221226505** → 종료 시 `process.exit()` 레이스. `insta/index.ts`의 `finish()`처럼 자연 종료 + unref 타이머로 처리.
