@@ -57,7 +57,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [retryTick, setRetryTick] = useState(0); // 다시 시도 트리거
-  const [afterNow, setAfterNow] = useState(true);
+  const [afterNow, setAfterNow] = useState(defaultView === "time");
   const [goodieOnly, setGoodieOnly] = useState(false);
   const [excludedTheaters, setExcludedTheaters] = useState<Set<number>>(new Set());
   const [excludedChains, setExcludedChains] = useState<Set<Chain>>(new Set());
@@ -86,11 +86,13 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
       // 지난 날짜가 복원되면 오늘로 클램프 — 어제 보던 탭을 오늘 열면
       // 과거 날짜가 선택돼 "지금 이후"가 무력화되고 지난 회차가 그대로 보이던 버그
       setSelectedDate(requestedDate && requestedDate >= todayStr() ? requestedDate : saved.selectedDate >= todayStr() ? saved.selectedDate : todayStr());
-      setAfterNow(saved.afterNow);
+      // 홈/극장 화면에서 날짜를 명시해 새로 들어온 경우 영화 화면은 하루 전체,
+      // 시간 화면은 지금 이후가 기본이다. 과거 저장 필터로 첫 화면이 비는 것을 막는다.
+      setAfterNow(requestedDate ? defaultView === "time" : saved.afterNow);
       setGoodieOnly(saved.goodieOnly ?? false);
       setExcludedTheaters(new Set(saved.excludedTheaters));
       setExcludedChains(new Set(saved.excludedChains));
-      setExcludedMovies(new Set(saved.excludedMovies));
+      setExcludedMovies(requestedDate ? new Set() : new Set(saved.excludedMovies));
     } else {
       if (requestedDate && requestedDate >= todayStr()) setSelectedDate(requestedDate);
       if (requestedView === "time" || defaultView === "time") setView("time");
@@ -330,6 +332,18 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     return result;
   }, [theaterFiltered]);
 
+  // 영화 선택 패널의 포스터는 "이 영화만 보기"로 동작한다.
+  // 유일하게 선택된 영화를 다시 누르면 전체 선택으로 돌아간다.
+  const handleSelectMovie = useCallback((movieId: number) => {
+    const availableIds = availableMovies.map((movie) => movie.id);
+    const selectedIds = availableIds.filter((id) => !excludedMovies.has(id));
+    if (selectedIds.length === 1 && selectedIds[0] === movieId) {
+      setExcludedMovies(new Set());
+      return;
+    }
+    setExcludedMovies(new Set(availableIds.filter((id) => id !== movieId)));
+  }, [availableMovies, excludedMovies]);
+
   const handleExcludeAllMovies = useCallback(() => {
     setExcludedMovies(new Set(availableMovies.map((m) => m.id)));
   }, [availableMovies]);
@@ -382,7 +396,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
         onToggleChain={handleToggleChain}
         movies={availableMovies}
         excludedMovies={excludedMovies}
-        onToggleMovie={handleToggleMovie}
+        onToggleMovie={handleSelectMovie}
         onResetMovies={handleResetMovies}
         onExcludeAllMovies={handleExcludeAllMovies}
         hasTheaterFilter={hasTheaterFilter}
