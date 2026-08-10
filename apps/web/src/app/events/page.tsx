@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import AppNav from "@/components/AppNav";
 import type { Chain } from "@mock/types";
 import { CHAIN_COLOR, CHAIN_LABEL, GOODIE_BADGE_CLASS, cleanGoodieName } from "@/lib/utils";
 import EventPeek, { type PeekTarget } from "@/components/EventPeek";
@@ -432,6 +433,7 @@ export default function EventsFeedPage() {
       )}
 
       {peek && <EventPeek target={peek} onClose={() => setPeek(null)} />}
+      <AppNav active="events" />
     </main>
   );
 }

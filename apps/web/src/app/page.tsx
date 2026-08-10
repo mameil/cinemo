@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ScreeningCard } from "@mock/types";
 import type { DateCoverage, TheaterInfo } from "@/components/HomeHeader";
+import AppNav from "@/components/AppNav";
 
 interface HomeResponse {
   date: string;
@@ -194,7 +195,7 @@ export default function DiscoverHome() {
               <b className="mt-2 block text-sm">극장으로</b>
               <small className="text-[10px] text-ink-3">자주 가는 곳 보기</small>
             </Link>
-            <Link href={`/movies?date=${selectedDate}&view=time`} className="rounded-2xl border border-line bg-panel p-3 transition-colors hover:border-app">
+            <Link href={`/timeline?date=${selectedDate}`} className="rounded-2xl border border-line bg-panel p-3 transition-colors hover:border-app">
               <span className="text-xl">🕐</span>
               <b className="mt-2 block text-sm">시간으로</b>
               <small className="text-[10px] text-ink-3">지금부터 보기</small>
@@ -290,13 +291,7 @@ export default function DiscoverHome() {
         )}
       </div>
 
-      <nav className="sticky bottom-3 mx-4 grid grid-cols-5 rounded-2xl border border-line bg-white/95 p-1.5 shadow-lg backdrop-blur-sm" aria-label="주요 메뉴">
-        <Link href="/" className="rounded-xl bg-app-tint py-2 text-center text-[11px] font-bold text-app">홈</Link>
-        <Link href={`/movies?date=${selectedDate}`} className="rounded-xl py-2 text-center text-[11px] font-semibold text-ink-2">영화</Link>
-        <Link href={`/movies?date=${selectedDate}&open=theaters`} className="rounded-xl py-2 text-center text-[11px] font-semibold text-ink-2">극장</Link>
-        <Link href={`/movies?date=${selectedDate}&view=time`} className="rounded-xl py-2 text-center text-[11px] font-semibold text-ink-2">시간</Link>
-        <Link href="/events" className="rounded-xl py-2 text-center text-[11px] font-semibold text-ink-2">특전</Link>
-      </nav>
+      <AppNav active="home" date={selectedDate} />
     </main>
   );
 }
