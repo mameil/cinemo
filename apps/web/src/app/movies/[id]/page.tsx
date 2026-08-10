@@ -453,7 +453,7 @@ export default function MovieDetailPage() {
     return (
       <main className="mx-auto max-w-[980px]">
         <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-white/95 px-3.5 py-2.5 backdrop-blur-sm">
-          <Link href="/" className="text-lg">←</Link>
+          <Link href="/movies" className="text-lg">←</Link>
           <b className="text-[15px]">불러오는 중…</b>
         </div>
         <div className="py-20 text-center text-sm text-ink-3">불러오는 중…</div>
@@ -465,7 +465,7 @@ export default function MovieDetailPage() {
     return (
       <main className="mx-auto max-w-[980px]">
         <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-white/95 px-3.5 py-2.5 backdrop-blur-sm">
-          <Link href="/" className="text-lg">←</Link>
+          <Link href="/movies" className="text-lg">←</Link>
           <b className="text-[15px]">{loadError ? "불러오기 실패" : "영화를 찾을 수 없습니다"}</b>
         </div>
         {loadError && (
@@ -488,7 +488,7 @@ export default function MovieDetailPage() {
     <main className="mx-auto max-w-[980px]">
       {/* 상단 네비 */}
       <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-white/95 px-3.5 py-2.5 backdrop-blur-sm">
-        <Link href="/" className="text-lg">←</Link>
+        <Link href="/movies" className="text-lg">←</Link>
         <b className="text-[15px]">{detail.title}</b>
       </div>
 

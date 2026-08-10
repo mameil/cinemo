@@ -94,6 +94,7 @@ interface Props {
   onResetTheaters: () => void;
   onRefresh: () => void;
   refreshing: boolean;
+  initialShowTheaters?: boolean;
 }
 
 const CHAIN_COLORS: Record<string, string> = {
@@ -112,8 +113,9 @@ export default function HomeHeader({
   movies, excludedMovies, onToggleMovie, onResetMovies, onExcludeAllMovies,
   hasTheaterFilter, hasMovieFilter, onResetTheaters,
   onRefresh, refreshing,
+  initialShowTheaters = false,
 }: Props) {
-  const [showTheaters, setShowTheaters] = useState(false);
+  const [showTheaters, setShowTheaters] = useState(initialShowTheaters);
   const [showMovies, setShowMovies] = useState(false);
   const updated = new Date(updatedAt);
   const goodsUpdated = new Date(goodsUpdatedAt);

@@ -1,21 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import type { ScreeningCard, Chain, EventPreview, GoodieStockLite } from "@mock/types";
-import HomeHeader, { type DateCoverage, type TheaterInfo } from "@/components/HomeHeader";
-import MovieGroupView from "@/components/MovieGroupView";
-import TimelineView from "@/components/TimelineView";
-import QueryBar, { type QueryChip } from "@/components/QueryBar";
-import { parseQuery } from "@/lib/query-parse";
-import { saveFilters, loadFilters } from "@/lib/filter-store";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { ScreeningCard } from "@mock/types";
+import type { DateCoverage, TheaterInfo } from "@/components/HomeHeader";
 
-interface MovieMiniResponse {
-  id: number;
-  title: string;
-  posterUrl: string | null;
-}
-
-interface HomeTimetableResponse {
+interface HomeResponse {
   date: string;
   coverage: {
     label: string;
@@ -26,408 +17,286 @@ interface HomeTimetableResponse {
   };
   updatedAt: string;
   goodsUpdatedAt: string;
-  movies: MovieMiniResponse[];
   screenings: ScreeningCard[];
-  eventPreviews: Record<string, EventPreview[]>;
-  goodieStock: Record<string, GoodieStockLite[]>;
 }
 
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+
+function localDateString(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function nowHHMM() {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
-function normTitle(s: string) {
-  return s.toLowerCase().replace(/\s+/g, "");
+function buildDates(maxDate?: string | null) {
+  const today = new Date();
+  const todayString = localDateString(today);
+  const last = maxDate && maxDate >= todayString ? new Date(`${maxDate}T00:00:00`) : null;
+  const diff = last ? Math.floor((last.getTime() - new Date(`${todayString}T00:00:00`).getTime()) / 86_400_000) + 1 : 8;
+  const count = Math.min(Math.max(diff, 1), 21);
+
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index);
+    return {
+      date: localDateString(date),
+      day: date.getDate(),
+      label: index === 0 ? "오늘" : index === 1 ? "내일" : DAY_NAMES[date.getDay()],
+    };
+  });
 }
 
-export default function Home() {
-  const [initialized, setInitialized] = useState(false);
-  const [view, setView] = useState<"movie" | "time">("movie");
-  const [selectedDate, setSelectedDate] = useState(todayStr());
-  const [data, setData] = useState<HomeTimetableResponse | null>(null);
+export default function DiscoverHome() {
+  const router = useRouter();
+  const [selectedDate, setSelectedDate] = useState(localDateString());
+  const [data, setData] = useState<HomeResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [retryTick, setRetryTick] = useState(0); // 다시 시도 트리거
-  const [afterNow, setAfterNow] = useState(true);
-  const [goodieOnly, setGoodieOnly] = useState(false);
-  const [excludedTheaters, setExcludedTheaters] = useState<Set<number>>(new Set());
-  const [excludedChains, setExcludedChains] = useState<Set<Chain>>(new Set());
-  const [excludedMovies, setExcludedMovies] = useState<Set<number>>(new Set());
-  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const [search, setSearch] = useState("");
 
-  // 쿼리 필터 (한 줄 검색 → 시간/장소/영화 레이어, 수동 필터와 별개)
-  const [queryMovie, setQueryMovie] = useState<string | null>(null);
-  const [queryLocation, setQueryLocation] = useState<string | null>(null);
-  const [queryTime, setQueryTime] = useState<{ from: string | null; to: string | null; label: string } | null>(null);
-  const [queryDateLabel, setQueryDateLabel] = useState<string | null>(null);
-
-  // 복원 (마운트 시 1회)
   useEffect(() => {
-    const saved = loadFilters();
-    if (saved) {
-      setView(saved.view);
-      // 지난 날짜가 복원되면 오늘로 클램프 — 어제 보던 탭을 오늘 열면
-      // 과거 날짜가 선택돼 "지금 이후"가 무력화되고 지난 회차가 그대로 보이던 버그
-      setSelectedDate(saved.selectedDate >= todayStr() ? saved.selectedDate : todayStr());
-      setAfterNow(saved.afterNow);
-      setGoodieOnly(saved.goodieOnly ?? false);
-      setExcludedTheaters(new Set(saved.excludedTheaters));
-      setExcludedChains(new Set(saved.excludedChains));
-      setExcludedMovies(new Set(saved.excludedMovies));
-    }
-    setInitialized(true);
-  }, []);
-
-  // 저장 (필터 변경 시)
-  useEffect(() => {
-    if (!initialized) return;
-    saveFilters({
-      view,
-      selectedDate,
-      afterNow,
-      goodieOnly,
-      excludedTheaters: [...excludedTheaters],
-      excludedChains: [...excludedChains],
-      excludedMovies: [...excludedMovies],
-    });
-  }, [initialized, view, selectedDate, afterNow, goodieOnly, excludedTheaters, excludedChains, excludedMovies]);
-
-  // 데이터 로드
-  useEffect(() => {
-    if (!initialized) return;
     setLoading(true);
-    setLoadError(false);
+    setError(false);
     fetch(`/api/screenings?date=${selectedDate}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
       })
-      .then((d) => setData(d))
-      .catch(() => setLoadError(true)) // DB 순간 장애 등 — 에러 상태로 전환
+      .then(setData)
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [selectedDate, initialized, retryTick]);
-
-  const isToday = selectedDate === todayStr();
-
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetch(`/api/screenings?date=${selectedDate}`)
-      .then((r) => r.json())
-      .then((d) => setData(d))
-      .finally(() => setRefreshing(false));
   }, [selectedDate]);
 
-  const handleToggleTheater = useCallback((id: number) => {
-    setExcludedTheaters((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const dates = buildDates(data?.coverage.maxDate);
+  const coverageByDate = new Map((data?.coverage.dateCoverage ?? []).map((item) => [item.date, item]));
+  const selectedCoverage = coverageByDate.get(selectedDate);
+  const isToday = selectedDate === localDateString();
 
-  const handleToggleArea = useCallback((area: string) => {
-    if (!data?.coverage.theaters) return;
-    const areaTheaters = data.coverage.theaters.filter((t) => t.area === area);
-    const allActive = areaTheaters.every((t) => !excludedTheaters.has(t.id));
-    setExcludedTheaters((prev) => {
-      const next = new Set(prev);
-      for (const t of areaTheaters) {
-        if (allActive) next.add(t.id);
-        else next.delete(t.id);
-      }
-      return next;
-    });
-  }, [data, excludedTheaters]);
-
-  const handleToggleChain = useCallback((chain: Chain) => {
-    setExcludedChains((prev) => {
-      const next = new Set(prev);
-      if (next.has(chain)) next.delete(chain);
-      else next.add(chain);
-      return next;
-    });
-  }, []);
-
-  const handleToggleMovie = useCallback((movieId: number) => {
-    setExcludedMovies((prev) => {
-      const next = new Set(prev);
-      if (next.has(movieId)) next.delete(movieId);
-      else next.add(movieId);
-      return next;
-    });
-  }, []);
-
-  const handleResetMovies = useCallback(() => {
-    setExcludedMovies(new Set());
-  }, []);
-
-  const handleResetTheaters = useCallback(() => {
-    setExcludedTheaters(new Set());
-    setExcludedChains(new Set());
-  }, []);
-
-  // ── 쿼리 한 줄 처리 ──
-
-  const handleQuerySubmit = useCallback((raw: string) => {
-    const parsed = parseQuery(raw, data?.coverage.theaters ?? []);
-    if (parsed.date) {
-      setSelectedDate(parsed.date);
-      setQueryDateLabel(parsed.dateLabel);
+  const upcomingMovies = useMemo(() => {
+    if (!data) return [];
+    const cutoff = isToday ? nowHHMM() : "00:00";
+    const byMovie = new Map<number, ScreeningCard>();
+    for (const screening of data.screenings) {
+      if (screening.startTime < cutoff) continue;
+      const current = byMovie.get(screening.movie.id);
+      if (!current || screening.startTime < current.startTime) byMovie.set(screening.movie.id, screening);
     }
-    if (parsed.timeFrom || parsed.timeTo) {
-      setQueryTime({ from: parsed.timeFrom, to: parsed.timeTo, label: parsed.timeLabel! });
+    return [...byMovie.values()].sort((a, b) => a.startTime.localeCompare(b.startTime)).slice(0, 6);
+  }, [data, isToday]);
+
+  const goodieMovies = useMemo(() => {
+    if (!data) return [];
+    const byMovie = new Map<number, ScreeningCard>();
+    for (const screening of data.screenings) {
+      if (!screening.hasEvent || byMovie.has(screening.movie.id)) continue;
+      byMovie.set(screening.movie.id, screening);
     }
-    if (parsed.location) setQueryLocation(parsed.location);
-    if (parsed.movieText) setQueryMovie(parsed.movieText);
+    return [...byMovie.values()].slice(0, 5);
   }, [data]);
 
-  const handleRemoveQueryChip = useCallback((key: string) => {
-    if (key === "movie") setQueryMovie(null);
-    else if (key === "location") setQueryLocation(null);
-    else if (key === "time") setQueryTime(null);
-    else if (key === "date") {
-      setQueryDateLabel(null);
-      setSelectedDate(todayStr());
-    }
-  }, []);
-
-  const handleClearQuery = useCallback(() => {
-    setQueryMovie(null);
-    setQueryLocation(null);
-    setQueryTime(null);
-    if (queryDateLabel) {
-      setQueryDateLabel(null);
-      setSelectedDate(todayStr());
-    }
-  }, [queryDateLabel]);
-
-  // 날짜를 스트립에서 직접 바꾸면 쿼리 날짜 칩은 해제
-  const handleDateChange = useCallback((date: string) => {
-    setSelectedDate(date);
-    setQueryDateLabel(null);
-  }, []);
-
-  // 쿼리 장소 → 극장 id 집합
-  const queryTheaterIds = useMemo(() => {
-    if (!queryLocation || !data?.coverage.theaters) return null;
-    return new Set(
-      data.coverage.theaters
-        .filter((t) => t.branchName.includes(queryLocation) || t.area.includes(queryLocation))
-        .map((t) => t.id)
-    );
-  }, [queryLocation, data]);
-
-  // 쿼리 영화 → 영화 id 집합 (해당 날짜 상영 영화와 대조)
-  const queryMovieIds = useMemo(() => {
-    if (!queryMovie || !data) return null;
-    const q = normTitle(queryMovie);
-    return new Set(
-      data.movies
-        .filter((m) => {
-          const t = normTitle(m.title);
-          return t.includes(q) || q.includes(t);
-        })
-        .map((m) => m.id)
-    );
-  }, [queryMovie, data]);
-
-  const queryChips: QueryChip[] = useMemo(() => {
-    const chips: QueryChip[] = [];
-    if (queryMovie) chips.push({ key: "movie", icon: "🎬", label: queryMovie });
-    if (queryLocation) chips.push({ key: "location", icon: "📍", label: queryLocation });
-    if (queryTime) chips.push({ key: "time", icon: "🕐", label: queryTime.label });
-    if (queryDateLabel) chips.push({ key: "date", icon: "📅", label: queryDateLabel });
-    return chips;
-  }, [queryMovie, queryLocation, queryTime, queryDateLabel]);
-
-  const queryHint =
-    queryMovie && queryMovieIds && queryMovieIds.size === 0 && !loading
-      ? `이날 "${queryMovie}" 상영을 찾지 못했어요`
-      : null;
-
-  const hasQueryFilter = queryChips.length > 0;
-
-  // ── 필터 파이프라인 ──
-
-  // 극장+체인+쿼리(장소·시간) 필터 (영화 목록 추출용)
-  const theaterFiltered = useMemo(() => {
+  const indieTheaters = useMemo(() => {
     if (!data) return [];
-    let list = data.screenings;
+    const map = new Map<number, { theater: ScreeningCard["theater"]; items: ScreeningCard[] }>();
+    for (const screening of data.screenings) {
+      if (screening.theater.chain !== "INDIE") continue;
+      const group = map.get(screening.theater.id) ?? { theater: screening.theater, items: [] };
+      group.items.push(screening);
+      map.set(screening.theater.id, group);
+    }
+    const cutoff = isToday ? nowHHMM() : "00:00";
+    return [...map.values()]
+      .map((group) => ({
+        ...group,
+        next: group.items.map((item) => item.startTime).filter((time) => time >= cutoff).sort()[0] ?? null,
+      }))
+      .sort((a, b) => {
+        if (a.next && b.next) return a.next.localeCompare(b.next);
+        if (a.next) return -1;
+        if (b.next) return 1;
+        return a.theater.branchName.localeCompare(b.theater.branchName);
+      })
+      .slice(0, 5);
+  }, [data, isToday]);
 
-    if (excludedTheaters.size > 0) {
-      list = list.filter((s) => !excludedTheaters.has(s.theater.id));
-    }
-    if (excludedChains.size > 0) {
-      list = list.filter((s) => !excludedChains.has(s.theater.chain));
-    }
-    if (queryTheaterIds) {
-      list = list.filter((s) => queryTheaterIds.has(s.theater.id));
-    }
-    if (queryTime?.from) {
-      list = list.filter((s) => s.startTime >= queryTime.from!);
-    }
-    if (queryTime?.to) {
-      list = list.filter((s) => s.startTime <= queryTime.to!);
-    }
-    if (afterNow && isToday) {
-      const now = nowHHMM();
-      list = list.filter((s) => s.startTime >= now);
-    }
-    // 특전 받는 상영만 (포맷 조건까지 통과한 회차 기준)
-    if (goodieOnly) {
-      list = list.filter((s) => s.hasEvent && s.eventTypes.length > 0);
-    }
-
-    return list;
-  }, [data, excludedTheaters, excludedChains, queryTheaterIds, queryTime, afterNow, isToday, goodieOnly]);
-
-  // 선택된 극장에서 실제 상영 중인 영화만
-  const availableMovies = useMemo(() => {
-    const seen = new Set<number>();
-    const result: MovieMiniResponse[] = [];
-    for (const s of theaterFiltered) {
-      if (!seen.has(s.movie.id)) {
-        seen.add(s.movie.id);
-        result.push(s.movie);
-      }
-    }
-    return result;
-  }, [theaterFiltered]);
-
-  const handleExcludeAllMovies = useCallback(() => {
-    setExcludedMovies(new Set(availableMovies.map((m) => m.id)));
-  }, [availableMovies]);
-
-  // 최종 필터 (영화 수동 제외 + 쿼리 영화)
-  const filtered = useMemo(() => {
-    let list = theaterFiltered;
-
-    if (excludedMovies.size > 0) {
-      list = list.filter((s) => !excludedMovies.has(s.movie.id));
-    }
-    if (queryMovieIds) {
-      list = list.filter((s) => queryMovieIds.has(s.movie.id));
-    }
-
-    return list;
-  }, [theaterFiltered, excludedMovies, queryMovieIds]);
-
-  const hasTheaterFilter = excludedTheaters.size > 0 || excludedChains.size > 0;
-  const hasMovieFilter = excludedMovies.size > 0;
+  function submitSearch(event: FormEvent) {
+    event.preventDefault();
+    const query = search.trim();
+    if (!query) return;
+    router.push(`/movies?date=${selectedDate}&query=${encodeURIComponent(query)}`);
+  }
 
   return (
-    <div className="mx-auto max-w-[980px]">
-      <HomeHeader
-        queryBar={
-          <QueryBar
-            chips={queryChips}
-            hint={queryHint}
-            onSubmit={handleQuerySubmit}
-            onRemoveChip={handleRemoveQueryChip}
-            onClearAll={handleClearQuery}
+    <main className="mx-auto min-h-screen max-w-[980px] pb-12">
+      <header className="sticky top-0 z-20 border-b border-line bg-white/95 px-4 pb-3 pt-4 backdrop-blur-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold tracking-[0.18em] text-app">CINEMO</p>
+            <h1 className="text-xl font-extrabold tracking-tight">오늘, 어떤 영화를 볼까요?</h1>
+          </div>
+          <Link href="/events" className="rounded-full border border-goodie-line bg-goodie-tint/60 px-3 py-1.5 text-xs font-bold text-goodie">
+            🎁 특전
+          </Link>
+        </div>
+
+        <form onSubmit={submitSearch} className="mt-3 flex items-center gap-2 rounded-xl border border-line bg-ground px-3 py-2 focus-within:border-app">
+          <span aria-hidden="true">🔍</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            aria-label="영화 검색"
+            placeholder="보고 싶은 영화를 검색해보세요"
+            className="min-w-0 flex-1 bg-transparent text-[13.5px] outline-none placeholder:text-ink-3"
           />
-        }
-        coverage={data?.coverage ?? { label: "로딩 중…", theaterCount: 0 }}
-        updatedAt={data?.updatedAt ?? new Date().toISOString()}
-        goodsUpdatedAt={data?.goodsUpdatedAt ?? new Date().toISOString()}
-        view={view}
-        onViewChange={setView}
-        selectedDate={selectedDate}
-        onDateChange={handleDateChange}
-        afterNow={afterNow}
-        onAfterNowChange={setAfterNow}
-        goodieOnly={goodieOnly}
-        onGoodieOnlyChange={setGoodieOnly}
-        isToday={isToday}
-        excludedTheaters={excludedTheaters}
-        onToggleTheater={handleToggleTheater}
-        onToggleArea={handleToggleArea}
-        excludedChains={excludedChains}
-        onToggleChain={handleToggleChain}
-        movies={availableMovies}
-        excludedMovies={excludedMovies}
-        onToggleMovie={handleToggleMovie}
-        onResetMovies={handleResetMovies}
-        onExcludeAllMovies={handleExcludeAllMovies}
-        hasTheaterFilter={hasTheaterFilter}
-        hasMovieFilter={hasMovieFilter}
-        onResetTheaters={handleResetTheaters}
-        onRefresh={handleRefresh}
-        refreshing={refreshing}
-      />
+          {search.trim() && <button className="text-xs font-bold text-app">찾기</button>}
+        </form>
 
-      {loading ? (
-        <div className="py-20 text-center text-sm text-ink-3">불러오는 중…</div>
-      ) : loadError ? (
-        <div className="py-20 text-center text-sm text-ink-3">
-          데이터를 불러오지 못했어요 (일시적인 문제일 수 있어요)
-          <br />
-          <button
-            onClick={() => setRetryTick((t) => t + 1)}
-            className="mt-3 rounded-full border border-line bg-panel px-4 py-1.5 text-xs font-semibold text-ink-2 hover:border-app hover:text-app transition-colors"
-          >
-            ↻ 다시 시도
-          </button>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="py-20 text-center text-sm text-ink-3">
-          {hasQueryFilter ? (
-            <>
-              조건에 맞는 상영이 없어요
-              <br />
+        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5">
+          {dates.map((item) => {
+            const active = item.date === selectedDate;
+            const status = coverageByDate.get(item.date);
+            return (
               <button
-                onClick={handleClearQuery}
-                className="mt-3 rounded-full border border-line bg-panel px-3 py-1 text-xs font-semibold text-ink-2 hover:border-app hover:text-app transition-colors"
+                key={item.date}
+                onClick={() => setSelectedDate(item.date)}
+                className={`flex-none rounded-xl border px-3 py-1.5 text-center ${active ? "border-ink bg-ink text-white" : "border-line bg-panel text-ink"}`}
               >
-                검색 조건 지우기
+                <small className={`block text-[10px] ${active ? "text-white/70" : "text-ink-3"}`}>{item.label}</small>
+                <b className="block text-[15px] leading-tight">{item.day}</b>
+                <span className={`mt-0.5 block text-[9px] ${active ? "text-white/75" : "text-ink-3"}`}>
+                  {status ? `${status.theaterCount}개 극장` : "일정 없음"}
+                </span>
               </button>
-            </>
-          ) : goodieOnly ? (
-            <>
-              특전 받는 상영이 없어요
-              <br />
-              <button
-                onClick={() => setGoodieOnly(false)}
-                className="mt-3 rounded-full border border-line bg-panel px-3 py-1 text-xs font-semibold text-ink-2 hover:border-goodie hover:text-goodie transition-colors"
-              >
-                🎁 특전만 해제
-              </button>
-            </>
-          ) : afterNow && isToday ? (
-            "지금 이후 상영이 없습니다"
-          ) : (
-            `${selectedDate} 상영 데이터가 없습니다`
-          )}
+            );
+          })}
         </div>
-      ) : view === "movie" ? (
-        <MovieGroupView
-          screenings={filtered}
-          eventPreviews={data?.eventPreviews}
-          goodieStock={data?.goodieStock}
-          onExcludeMovie={handleToggleMovie}
-        />
-      ) : (
-        <TimelineView screenings={filtered} eventPreviews={data?.eventPreviews} />
-      )}
+      </header>
 
-      {/* 최근 배포 정보 — 빌드 시점에 구워짐 */}
-      <footer className="py-6 text-center text-[10.5px] text-ink-3">
-        최근 배포 {formatBuildAt(process.env.NEXT_PUBLIC_BUILD_AT)} · {process.env.NEXT_PUBLIC_COMMIT}
-      </footer>
-    </div>
+      <div className="space-y-7 px-4 py-5">
+        {selectedCoverage && data && selectedDate > localDateString() && selectedCoverage.theaterCount < Math.ceil(data.coverage.theaterCount * 0.7) && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            아직 일부 극장 일정만 등록됐어요 · {selectedCoverage.theaterCount}/{data.coverage.theaterCount}개 극장
+          </div>
+        )}
+
+        <section>
+          <h2 className="mb-2.5 text-sm font-extrabold">어떻게 찾을까요?</h2>
+          <div className="grid grid-cols-3 gap-2">
+            <Link href={`/movies?date=${selectedDate}`} className="rounded-2xl border border-line bg-panel p-3 transition-colors hover:border-app">
+              <span className="text-xl">🎬</span>
+              <b className="mt-2 block text-sm">영화로</b>
+              <small className="text-[10px] text-ink-3">포스터부터 보기</small>
+            </Link>
+            <Link href={`/movies?date=${selectedDate}&open=theaters`} className="rounded-2xl border border-line bg-panel p-3 transition-colors hover:border-app">
+              <span className="text-xl">🏠</span>
+              <b className="mt-2 block text-sm">극장으로</b>
+              <small className="text-[10px] text-ink-3">자주 가는 곳 보기</small>
+            </Link>
+            <Link href={`/movies?date=${selectedDate}&view=time`} className="rounded-2xl border border-line bg-panel p-3 transition-colors hover:border-app">
+              <span className="text-xl">🕐</span>
+              <b className="mt-2 block text-sm">시간으로</b>
+              <small className="text-[10px] text-ink-3">지금부터 보기</small>
+            </Link>
+          </div>
+        </section>
+
+        {loading ? (
+          <div className="space-y-3" aria-label="시간표 불러오는 중">
+            {[0, 1, 2].map((item) => <div key={item} className="h-28 animate-pulse rounded-2xl bg-line-soft" />)}
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-line bg-panel p-6 text-center text-sm text-ink-3">
+            시간표를 불러오지 못했어요.
+            <button onClick={() => window.location.reload()} className="ml-2 font-bold text-app">다시 시도</button>
+          </div>
+        ) : (
+          <>
+            <section>
+              <div className="mb-2.5 flex items-end justify-between">
+                <div>
+                  <h2 className="text-base font-extrabold">{isToday ? "지금부터 볼 수 있는 영화" : "가장 빠른 상영 영화"}</h2>
+                  <p className="text-[11px] text-ink-3">다음 상영 시간이 가까운 순서예요</p>
+                </div>
+                <Link href={`/movies?date=${selectedDate}`} className="text-xs font-bold text-app">전체 보기 →</Link>
+              </div>
+              {upcomingMovies.length > 0 ? (
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {upcomingMovies.map((screening) => (
+                    <Link key={screening.movie.id} href={`/movies/${screening.movie.id}`} className="w-[112px] flex-none">
+                      {screening.movie.posterUrl ? (
+                        <img src={screening.movie.posterUrl.replace("/w500/", "/w200/")} alt={`${screening.movie.title} 포스터`} className="h-[160px] w-[112px] rounded-xl bg-line-soft object-cover shadow-sm" />
+                      ) : (
+                        <div className="flex h-[160px] w-[112px] items-center justify-center rounded-xl bg-line-soft text-2xl">🎞️</div>
+                      )}
+                      <b className="mt-1.5 block truncate text-[13px]">{screening.movie.title}</b>
+                      <span className="text-[11px] font-bold text-app">{screening.startTime}</span>
+                      <small className="ml-1 text-[10px] text-ink-3">{screening.theater.branchName}</small>
+                    </Link>
+                  ))}
+                </div>
+              ) : <p className="rounded-xl bg-ground p-4 text-center text-xs text-ink-3">남은 상영이 없어요</p>}
+            </section>
+
+            {goodieMovies.length > 0 && (
+              <section>
+                <div className="mb-2.5 flex items-end justify-between">
+                  <div>
+                    <h2 className="text-base font-extrabold">오늘 특전 있는 영화</h2>
+                    <p className="text-[11px] text-ink-3">상영 회차에 연결된 특전이 있어요</p>
+                  </div>
+                  <Link href="/events" className="text-xs font-bold text-goodie">특전 전체 →</Link>
+                </div>
+                <div className="flex gap-2.5 overflow-x-auto pb-2">
+                  {goodieMovies.map((screening) => (
+                    <Link key={screening.movie.id} href={`/movies/${screening.movie.id}`} className="flex w-[230px] flex-none gap-3 rounded-2xl border border-goodie-line bg-goodie-tint/40 p-2.5">
+                      {screening.movie.posterUrl ? (
+                        <img src={screening.movie.posterUrl.replace("/w500/", "/w200/")} alt={`${screening.movie.title} 포스터`} className="h-[84px] w-[58px] rounded-lg object-cover" />
+                      ) : <div className="flex h-[84px] w-[58px] items-center justify-center rounded-lg bg-line-soft">🎞️</div>}
+                      <div className="min-w-0 py-1">
+                        <b className="block truncate text-[13px]">{screening.movie.title}</b>
+                        <span className="mt-2 inline-block rounded-full border border-goodie-line bg-white px-2 py-0.5 text-[10px] font-bold text-goodie">
+                          🎁 {screening.eventTypes.map((type) => type === "기타" ? "이벤트" : type).join(" · ")}
+                        </span>
+                        <small className="mt-2 block truncate text-[10px] text-ink-3">{screening.theater.branchName}</small>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section>
+              <div className="mb-2.5 flex items-end justify-between">
+                <div>
+                  <h2 className="text-base font-extrabold">독립영화관 시간표</h2>
+                  <p className="text-[11px] text-ink-3">오늘 일정이 있는 독립영화관을 모았어요</p>
+                </div>
+                <Link href={`/movies?date=${selectedDate}&open=theaters`} className="text-xs font-bold text-app">전체 보기 →</Link>
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-line bg-panel">
+                {indieTheaters.map((group) => (
+                  <Link key={group.theater.id} href={`/movies?date=${selectedDate}&theater=${group.theater.id}`} className="flex items-center gap-3 border-b border-line-soft px-3.5 py-3 last:border-b-0 hover:bg-ground">
+                    <span className="h-2.5 w-2.5 flex-none rounded-full bg-[#555]" />
+                    <b className="min-w-0 flex-1 truncate text-[13px]">{group.theater.branchName}</b>
+                    <span className="text-[11px] text-ink-3">{group.next ? `다음 ${group.next}` : "오늘 상영 종료"}</span>
+                    <span className="w-8 text-right text-[11px] font-bold text-app">{group.items.length}회</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+      </div>
+
+      <nav className="sticky bottom-3 mx-4 grid grid-cols-5 rounded-2xl border border-line bg-white/95 p-1.5 shadow-lg backdrop-blur-sm" aria-label="주요 메뉴">
+        <Link href="/" className="rounded-xl bg-app-tint py-2 text-center text-[11px] font-bold text-app">홈</Link>
+        <Link href={`/movies?date=${selectedDate}`} className="rounded-xl py-2 text-center text-[11px] font-semibold text-ink-2">영화</Link>
+        <Link href={`/movies?date=${selectedDate}&open=theaters`} className="rounded-xl py-2 text-center text-[11px] font-semibold text-ink-2">극장</Link>
+        <Link href={`/movies?date=${selectedDate}&view=time`} className="rounded-xl py-2 text-center text-[11px] font-semibold text-ink-2">시간</Link>
+        <Link href="/events" className="rounded-xl py-2 text-center text-[11px] font-semibold text-ink-2">특전</Link>
+      </nav>
+    </main>
   );
-}
-
-/** 빌드 ISO 시각 → KST "M/D HH:mm" (서버/클라 동일 결과 — 하이드레이션 안전) */
-function formatBuildAt(iso?: string): string {
-  if (!iso) return "-";
-  const kst = new Date(new Date(iso).getTime() + 9 * 3600e3);
-  return `${kst.getUTCMonth() + 1}/${kst.getUTCDate()} ${String(kst.getUTCHours()).padStart(2, "0")}:${String(kst.getUTCMinutes()).padStart(2, "0")}`;
 }
