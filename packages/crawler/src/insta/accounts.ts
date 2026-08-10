@@ -27,10 +27,13 @@ export const INSTA_ACCOUNTS: InstaAccount[] = INDIE_THEATERS.map((theater) => ({
 export const SHARD_COUNT = 3;
 
 /** 호스트명 → shard 인덱스. 모르는 호스트는 env INSTA_SHARD 또는 전체(폴백). */
+// 회사망 DHCP/DNS가 호스트명을 바꾸는 사례 확인(08-10: DESKTOP-F8OH9L9 → I-SP1-M3) —
+// 옛 이름도 남겨두고, 근본 방어는 setup 스크립트가 스케줄러에 INSTA_SHARD를 박아 넣는 것.
 const HOST_SHARD: Record<string, number> = {
   "KDs-MacBook-Pro.local": 0,
   "DW-KD-SHIM1-D2": 1,
   "DESKTOP-F8OH9L9.kebt.co.kr": 2,
+  "I-SP1-M3.local": 2,
 };
 
 /** 현재 기계의 shard — env INSTA_SHARD 우선, 없으면 호스트명 매핑, 그것도 없으면 null(=전체). */

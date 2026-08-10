@@ -3,6 +3,8 @@
 # 회사 윈도우 데스크탑에서 1회 실행하면 "하루 3회(10/15/20시)" 작업이 등록된다.
 # 맥의 launchd(insta-local-setup.sh)와 대칭. 재실행하면 기존 작업을 교체(idempotent).
 #
+# $env:INSTA_SHARD=N 상태로 실행하면 계정 분담 shard를 작업에 박아 넣는다(호스트명 변동 방어).
+#
 #   실행:  powershell -ExecutionPolicy Bypass -File scripts\insta-local-setup.ps1
 #   제거:  Unregister-ScheduledTask -TaskName cinemo-insta-local -Confirm:$false
 #   즉시 1회:  Start-ScheduledTask -TaskName cinemo-insta-local
@@ -47,8 +49,14 @@ if (-not $chrome) {
 $triggers = @(10, 15, 20) | ForEach-Object {
     New-ScheduledTaskTrigger -Daily -At ([datetime]::Today.AddHours($_))
 }
+# 계정 분담 shard — 설치 시 지정하면 작업 커맨드에 박제(호스트명 바뀌어도 유지)
+$Shard = $env:INSTA_SHARD
+if ($Shard -and $Shard -notmatch '^\d+$') { throw "INSTA_SHARD 는 숫자여야 함: $Shard" }
+# set은 따옴표로 감쌈 — `set VAR=N & ...` 는 값 뒤에 공백이 붙는다 (아래 폴러 주석 참고)
+$shardPrefix = if ($Shard) { "set `"INSTA_SHARD=$Shard`" & " } else { "" }
+
 # cmd.exe /c "<wrapper>" 로 래퍼 실행
-$action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" -Argument "/c `"$Wrapper`""
+$action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" -Argument "/c $shardPrefix`"$Wrapper`""
 # 예약 시각에 PC가 꺼져/자고 있었으면 켜진 뒤 밀린 실행 1회 (launchd 코얼레싱과 동일 취지)
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 20) `
@@ -70,7 +78,7 @@ $PollTaskName = "cinemo-insta-poll"
 # set "VAR=1" 처럼 따옴표로 감쌀 것 — `set VAR=1 & ...` 는 값이 "1 "(뒤 공백)이 돼
 # 래퍼의 =="1" 비교가 빗나가고, 폴러가 매 5분 풀 수집을 돌아버린다.
 $pollAction = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" `
-    -Argument "/c set `"INSTA_POLL=1`" & `"$Wrapper`""
+    -Argument "/c set `"INSTA_POLL=1`" & $shardPrefix`"$Wrapper`""
 # -Once + 5분 반복, 기간 미지정(=무기한). Repetition 복사 트릭.
 $pollTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date)
 $pollTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) `
@@ -83,6 +91,7 @@ Register-ScheduledTask -TaskName $PollTaskName -Trigger $pollTrigger -Action $po
     -Description "cinemo 인스타 로컬 수집 폴러 (5분마다 실행 요청 확인)" | Out-Null
 
 Write-Host ""
-Write-Host "등록 완료: $TaskName (하루 3회) + $PollTaskName (5분 폴링)"
+$shardMsg = if ($Shard) { " · shard=$Shard" } else { "" }
+Write-Host "등록 완료: $TaskName (하루 3회$shardMsg) + $PollTaskName (5분 폴링)"
 Write-Host "즉시 1회 실행:  Start-ScheduledTask -TaskName $TaskName"
 Write-Host "로그:           $env:LOCALAPPDATA\cinemo-insta-local.log"

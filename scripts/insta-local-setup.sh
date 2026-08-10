@@ -5,7 +5,10 @@
 # 윈도우의 작업 스케줄러(insta-local-setup.ps1)와 대칭. 재실행하면 교체(idempotent).
 # plist를 이 맥의 실제 경로로 생성하므로 클론 위치에 무관하다(두 맥 교대 대비).
 #
-#   실행:      sh scripts/insta-local-setup.sh
+# INSTA_SHARD=N 로 실행하면 계정 분담 shard를 plist에 박아 넣는다(호스트명 변동 방어).
+# 회사망 DHCP가 호스트명을 바꿔 HOST_SHARD 매핑이 풀리는 사례 확인(08-10) — env가 근본 방어.
+#
+#   실행:      sh scripts/insta-local-setup.sh          (또는 INSTA_SHARD=2 sh scripts/...)
 #   제거:      launchctl unload ~/Library/LaunchAgents/com.cinemo.insta-local.plist
 #   즉시 1회:  launchctl start com.cinemo.insta-local
 #   로그:      ~/Library/Logs/cinemo-insta-local.log
@@ -33,6 +36,17 @@ fi
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
 
+# 계정 분담 shard — 설치 시 지정하면 plist에 박제(호스트명 바뀌어도 유지)
+SHARD="${INSTA_SHARD:-}"
+if [ -n "$SHARD" ]; then
+  case "$SHARD" in
+    *[!0-9]*) echo "INSTA_SHARD 는 숫자여야 함: $SHARD"; exit 1 ;;
+  esac
+  SHARD_ENV="<key>INSTA_SHARD</key><string>$SHARD</string>"
+else
+  SHARD_ENV=""
+fi
+
 # 하루 3회(10/15/20시) 트리거 — 인스타 IP 차단 완화(저빈도). 2026-08-09: 매시→3회로 축소.
 TRIGGERS=""
 for h in 10 15 20; do
@@ -47,6 +61,7 @@ cat > "$PLIST" <<EOF
     <key>Label</key><string>$LABEL</string>
     <key>ProgramArguments</key>
     <array><string>/bin/sh</string><string>$WRAPPER</string></array>
+    <key>EnvironmentVariables</key><dict>$SHARD_ENV</dict>
     <key>StartCalendarInterval</key>
     <array>
 $TRIGGERS    </array>
@@ -71,7 +86,7 @@ cat > "$POLL_PLIST" <<EOF
     <key>Label</key><string>$POLL_LABEL</string>
     <key>ProgramArguments</key>
     <array><string>/bin/sh</string><string>$WRAPPER</string></array>
-    <key>EnvironmentVariables</key><dict><key>INSTA_POLL</key><string>1</string></dict>
+    <key>EnvironmentVariables</key><dict><key>INSTA_POLL</key><string>1</string>$SHARD_ENV</dict>
     <key>StartInterval</key><integer>300</integer>
     <key>RunAtLoad</key><false/>
     <key>StandardOutPath</key><string>$LAUNCHD_LOG</string>
@@ -83,6 +98,8 @@ plutil -lint "$POLL_PLIST" >/dev/null
 launchctl unload "$POLL_PLIST" 2>/dev/null || true
 launchctl load "$POLL_PLIST"
 
-echo "등록 완료: $LABEL (하루 3회(10/15/20시)) + $POLL_LABEL (5분 폴링)"
+SHARD_MSG=""
+[ -n "$SHARD" ] && SHARD_MSG=" · shard=$SHARD"
+echo "등록 완료: $LABEL (하루 3회(10/15/20시)$SHARD_MSG) + $POLL_LABEL (5분 폴링)"
 echo "즉시 1회 실행:  launchctl start $LABEL"
 echo "로그:           $HOME/Library/Logs/cinemo-insta-local.log"
