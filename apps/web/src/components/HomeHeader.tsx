@@ -50,10 +50,19 @@ interface MovieMini {
   posterUrl: string | null;
 }
 
+export interface DateCoverage {
+  date: string;
+  screeningCount: number;
+  theaterCount: number;
+  indieTheaterCount: number;
+}
+
 interface CoverageWithTheaters extends Coverage {
   theaters?: TheaterInfo[];
   /** DB에 존재하는 마지막 상영일 (YYYY-MM-DD) — 날짜 스트립 범위 */
   maxDate?: string | null;
+  /** 날짜별로 실제 상영정보가 등록된 범위 */
+  dateCoverage?: DateCoverage[];
 }
 
 interface Props {
@@ -119,6 +128,17 @@ export default function HomeHeader({
   }
 
   const dates = buildDates(coverage.maxDate);
+  const coverageByDate = new Map((coverage.dateCoverage ?? []).map((item) => [item.date, item]));
+  const selectedCoverage = coverageByDate.get(selectedDate);
+  const todayDate = dates[0]?.dateStr;
+  // 당일 휴관은 정상일 수 있으므로 경고하지 않는다. 미래 날짜가 전체 카탈로그의
+  // 70% 미만일 때만 아직 일부 극장 일정만 열린 것으로 안내한다.
+  const partialThreshold = Math.ceil(coverage.theaterCount * 0.7);
+  const isPartialCoverage = Boolean(
+    selectedCoverage &&
+    selectedDate > (todayDate ?? selectedDate) &&
+    selectedCoverage.theaterCount < partialThreshold
+  );
 
   // 지역별 그룹핑
   const theatersByArea = new Map<string, TheaterInfo[]>();
@@ -291,6 +311,7 @@ export default function HomeHeader({
       <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5">
         {dates.map((d) => {
           const active = d.dateStr === selectedDate;
+          const dateStatus = coverageByDate.get(d.dateStr);
           return (
             <button
               key={d.dateStr}
@@ -304,11 +325,20 @@ export default function HomeHeader({
               <small className={`block text-[10px] ${active ? "text-white/70" : "text-ink-3"}`}>
                 {d.label}
               </small>
-              <b className="text-[15px]">{d.day}</b>
+              <b className="block text-[15px] leading-tight">{d.day}</b>
+              <span className={`mt-0.5 block text-[9px] tabular-nums ${active ? "text-white/75" : "text-ink-3"}`}>
+                {dateStatus ? `${dateStatus.theaterCount}개 극장` : "일정 없음"}
+              </span>
             </button>
           );
         })}
       </div>
+
+      {isPartialCoverage && selectedCoverage && (
+        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+          아직 일부 극장 일정만 등록됐어요 · {selectedCoverage.theaterCount}/{coverage.theaterCount}개 극장
+        </div>
+      )}
 
       {/* 뷰 토글 + 지금 이후 */}
       <div className="mt-2.5 flex items-center gap-2">

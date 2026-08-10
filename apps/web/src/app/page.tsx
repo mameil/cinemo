@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import type { ScreeningCard, Chain, EventPreview, GoodieStockLite } from "@mock/types";
-import HomeHeader, { type TheaterInfo } from "@/components/HomeHeader";
+import HomeHeader, { type DateCoverage, type TheaterInfo } from "@/components/HomeHeader";
 import MovieGroupView from "@/components/MovieGroupView";
 import TimelineView from "@/components/TimelineView";
 import QueryBar, { type QueryChip } from "@/components/QueryBar";
@@ -22,6 +22,7 @@ interface HomeTimetableResponse {
     theaterCount: number;
     theaters?: TheaterInfo[];
     maxDate?: string | null;
+    dateCoverage?: DateCoverage[];
   };
   updatedAt: string;
   goodsUpdatedAt: string;

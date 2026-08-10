@@ -25,7 +25,8 @@ const EXCLUDE_KEYWORDS = [
 
 async function handleGet(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const date = searchParams.get("date") ?? todayKST();
+  const today = todayKST();
+  const date = searchParams.get("date") ?? today;
 
   // 지역 키워드 필터 (포함 + 제외)
   const includeFilter = or(
@@ -340,10 +341,30 @@ async function handleGet(req: NextRequest) {
     }))
     .sort((a, b) => a.area.localeCompare(b.area) || a.branchName.localeCompare(b.branchName));
 
-  // DB에 존재하는 마지막 상영일 — 홈 날짜 스트립이 하드코딩 대신 이 값까지 그린다
-  const [dateRange] = await db
-    .select({ maxDate: sql<string | null>`MAX(${screenings.playDate})` })
-    .from(screenings);
+  // 서비스 대상 극장의 날짜별 등록 범위. 날짜 칩에서 "몇 개 극장 일정이
+  // 실제로 들어왔는지"를 보여주고, 먼 미래의 일부 일정만 전체처럼 보이지 않게 한다.
+  // 최대 21일만 노출하므로 그 이후 데이터는 홈 응답에 싣지 않는다.
+  const coverageEnd = addDays(today, 20);
+  const dateCoverage = await db
+    .select({
+      date: screenings.playDate,
+      screeningCount: sql<number>`COUNT(*)`,
+      theaterCount: sql<number>`COUNT(DISTINCT ${screenings.theaterId})`,
+      indieTheaterCount: sql<number>`COUNT(DISTINCT CASE WHEN ${theaters.chain} = 'INDIE' THEN ${screenings.theaterId} END)`,
+    })
+    .from(screenings)
+    .innerJoin(theaters, eq(screenings.theaterId, theaters.id))
+    .where(
+      and(
+        sql`${screenings.playDate} >= ${today}`,
+        sql`${screenings.playDate} <= ${coverageEnd}`,
+        branchFilter,
+      )
+    )
+    .groupBy(screenings.playDate)
+    .orderBy(screenings.playDate);
+
+  const maxDate = dateCoverage.at(-1)?.date ?? null;
 
   const result = {
     date,
@@ -351,7 +372,13 @@ async function handleGet(req: NextRequest) {
       label: "파주 · 일산 · 고양 · 서울 서부",
       theaterCount: theaterInfoMap.size,
       theaters: theaterList,
-      maxDate: dateRange?.maxDate ?? null,
+      maxDate,
+      dateCoverage: dateCoverage.map((item) => ({
+        date: item.date,
+        screeningCount: Number(item.screeningCount),
+        theaterCount: Number(item.theaterCount),
+        indieTheaterCount: Number(item.indieTheaterCount),
+      })),
     },
     updatedAt: latestUpdate || new Date().toISOString(),
     goodsUpdatedAt: goodsUpdatedAt || new Date().toISOString(),
@@ -369,4 +396,10 @@ function todayKST(): string {
   // KST = UTC+9
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
   return kst.toISOString().slice(0, 10);
+}
+
+function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
