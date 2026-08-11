@@ -320,6 +320,19 @@ async function handleGet(req: NextRequest) {
     }
   });
 
+  // 극장 카드의 마지막 수집 상태. 선택 날짜에 일정이 없는 극장도 이전 수집
+  // 기록을 확인할 수 있도록 날짜와 무관하게 극장별 최신 갱신 시각을 집계한다.
+  const theaterUpdateRows = await db
+    .select({
+      theaterId: screenings.theaterId,
+      updatedAt: sql<string | null>`MAX(${screenings.updatedAt})`,
+    })
+    .from(screenings)
+    .innerJoin(theaters, eq(screenings.theaterId, theaters.id))
+    .where(branchFilter)
+    .groupBy(screenings.theaterId);
+  const theaterUpdatedAt = new Map(theaterUpdateRows.map((row) => [row.theaterId, row.updatedAt]));
+
   // 지역 그룹핑
   const AREA_RULES: { label: string; keywords: string[] }[] = [
     { label: "일산·고양", keywords: ["일산", "고양", "화정", "행신", "백석", "스타필드", "라페스타", "킨텍스"] },
@@ -339,6 +352,7 @@ async function handleGet(req: NextRequest) {
       ...t,
       area: t.chain === "INDIE" ? "독립영화관" : getArea(t.branchName),
       openToday: openTheaterIds.has(t.id), // 그 날 상영 있음 여부 (없으면 필터에 '쉼' 표시)
+      updatedAt: theaterUpdatedAt.get(t.id) ?? null,
     }))
     .sort((a, b) => a.area.localeCompare(b.area) || a.branchName.localeCompare(b.branchName));
 

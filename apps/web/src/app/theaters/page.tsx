@@ -52,6 +52,18 @@ function datesUntil(maxDate?: string | null) {
   });
 }
 
+function updateLabel(updatedAt?: string | null) {
+  if (!updatedAt) return "갱신 기록 없음";
+  const timestamp = new Date(updatedAt).getTime();
+  if (!Number.isFinite(timestamp)) return "갱신 시각 미확인";
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
+  if (minutes < 5) return "방금 갱신";
+  if (minutes < 60) return `${minutes}분 전 갱신`;
+  if (minutes < 1_440) return `${Math.floor(minutes / 60)}시간 전 갱신`;
+  const date = new Date(timestamp);
+  return `${date.getMonth() + 1}/${date.getDate()} 갱신`;
+}
+
 function TheaterRow({
   theater,
   selectedDate,
@@ -85,6 +97,7 @@ function TheaterRow({
           <small className="text-[10px] text-ink-3">
             {!hasSchedule ? "일정 없음" : theater.next ? `다음 상영 ${theater.next}` : "오늘 상영 종료"}
           </small>
+          <small className="ml-1 text-[9px] text-ink-3">· {updateLabel(theater.updatedAt)}</small>
         </div>
         {hasSchedule && <span className="text-[11px] font-bold text-app">{theater.items.length}회</span>}
         <span className="text-xs text-ink-3">›</span>

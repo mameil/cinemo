@@ -42,6 +42,8 @@ export interface TheaterInfo {
   area: string;
   /** 선택 날짜에 상영이 있는지 — false면 그 날 쉬는 극장 (필터에 '쉼' 표시) */
   openToday?: boolean;
+  /** 이 극장의 시간표를 마지막으로 수집·갱신한 시각 */
+  updatedAt?: string | null;
 }
 
 interface MovieMini {
