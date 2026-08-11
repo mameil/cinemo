@@ -26,6 +26,9 @@ interface FeedEvent {
   allSoldOut: boolean;
   isNew: boolean;
   upcoming: boolean;
+  stockState: "confirmed" | "unverified" | "soldout";
+  lastCheckedAt: string;
+  todayScreenings: { theaterId: number; branchName: string; times: string[] }[];
 }
 
 const CHAIN_CLASS: Record<string, string> = {
@@ -47,6 +50,21 @@ function dday(endDate: string, today: string): string {
   return `D-${diff}`;
 }
 
+function stockLabel(event: FeedEvent): { text: string; className: string } {
+  if (event.upcoming) return { text: "증정 예정", className: "border-line bg-ground text-ink-3" };
+  if (event.stockState === "soldout") return { text: "소진 확인됨", className: "border-soldout/30 bg-soldout/5 text-soldout" };
+  if (event.stockState === "confirmed") return { text: "재고 확인됨", className: "border-ok/30 bg-ok/5 text-ok" };
+  return { text: "증정 진행 중 · 재고 미확인", className: "border-goodie-line bg-goodie-tint text-goodie" };
+}
+
+function checkedAgo(iso: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
+  if (minutes < 60) return `${minutes}분 전 확인`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}시간 전 확인`;
+  return `${Math.round(hours / 24)}일 전 확인`;
+}
+
 export default function EventsFeedPage() {
   const [data, setData] = useState<{ today: string; events: FeedEvent[] } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +72,7 @@ export default function EventsFeedPage() {
   const [retryTick, setRetryTick] = useState(0);
   const [chainFilter, setChainFilter] = useState<Set<string>>(new Set());
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
+  const [scope, setScope] = useState<"available" | "upcoming" | "soldout" | "all">("available");
   const [view, setView] = useState<"card" | "list">("card");
   const [peek, setPeek] = useState<PeekTarget | null>(null);
   // 관심 없는 영화/이벤트 숨기기 (sessionStorage 유지)
@@ -107,12 +126,15 @@ export default function EventsFeedPage() {
   const filtered = useMemo(() => {
     if (!data) return [];
     let list = data.events;
+    if (scope === "available") list = list.filter((e) => e.category === "특전" && !e.upcoming && !e.allSoldOut);
+    else if (scope === "upcoming") list = list.filter((e) => e.category === "특전" && e.upcoming);
+    else if (scope === "soldout") list = list.filter((e) => e.allSoldOut);
     if (chainFilter.size > 0) list = list.filter((e) => chainFilter.has(e.chain));
     if (categoryFilter.size > 0) list = list.filter((e) => categoryFilter.has(e.category));
     if (excludedMovies.size > 0) list = list.filter((e) => !e.movie || !excludedMovies.has(e.movie.id));
     if (excludedEvents.size > 0) list = list.filter((e) => !excludedEvents.has(e.id));
     return list;
-  }, [data, chainFilter, categoryFilter, excludedMovies, excludedEvents]);
+  }, [data, scope, chainFilter, categoryFilter, excludedMovies, excludedEvents]);
 
   // 숨긴 항목 (복원 바 표시용) — 필터 전 전체 목록에서 찾음
   const hiddenChips = useMemo(() => {
@@ -165,8 +187,8 @@ export default function EventsFeedPage() {
       {/* 상단 네비 */}
       <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-white/95 px-3.5 py-2.5 backdrop-blur-sm">
         <Link href="/" className="text-lg">←</Link>
-        <b className="text-[15px]">📣 이벤트 피드</b>
-        <span className="text-[11px] text-ink-3">최신 시작순 · 전국</span>
+        <b className="text-[15px]">🎁 특전</b>
+        <span className="text-[11px] text-ink-3">받을 수 있는 특전부터</span>
         {/* 카드/리스트 토글 */}
         <div className="ml-auto inline-flex rounded-[10px] bg-[#e7ebf1] p-0.5">
           <button
@@ -186,6 +208,23 @@ export default function EventsFeedPage() {
             리스트
           </button>
         </div>
+      </div>
+
+      <div className="flex gap-1.5 overflow-x-auto px-3.5 pt-3">
+        {([
+          ["available", "오늘 받을 수 있음"],
+          ["upcoming", "증정 예정"],
+          ["soldout", "소진 확인"],
+          ["all", "전체 이벤트"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setScope(key)}
+            className={`flex-none rounded-full border px-3 py-1.5 text-[12px] font-bold ${scope === key ? "border-goodie bg-goodie-tint text-goodie" : "border-line bg-panel text-ink-3"}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* 필터 칩 */}
@@ -275,6 +314,7 @@ export default function EventsFeedPage() {
           {filtered.map((e) => {
             const thumb = e.detailImages[0] ?? e.imageUrl ?? e.movie?.posterUrl ?? null;
             const mainName = cleanGoodieName(e.goodieNames[0] ?? e.eventName) || e.eventName;
+            const status = stockLabel(e);
             return (
               <div
                 key={e.id}
@@ -315,6 +355,7 @@ export default function EventsFeedPage() {
                     {e.types.map((t) => (t === "기타" ? "이벤트" : t)).join("·")}
                     {e.movie && <> · 🎬 {e.movie.title}</>}
                   </p>
+                  <span className={`mt-1 inline-block rounded-full border px-1.5 py-px text-[9.5px] font-bold ${status.className}`}>{status.text}</span>
                 </div>
                 {/* 우측: 기간·지역 */}
                 <div className="flex-none text-right text-[10.5px] leading-snug">
@@ -349,6 +390,7 @@ export default function EventsFeedPage() {
           {filtered.map((e) => {
             const thumb = e.detailImages[0] ?? e.imageUrl ?? e.movie?.posterUrl ?? null;
             const mainName = cleanGoodieName(e.goodieNames[0] ?? e.eventName) || e.eventName;
+            const status = stockLabel(e);
             return (
               <div
                 key={e.id}
@@ -396,6 +438,21 @@ export default function EventsFeedPage() {
                       ))}
                     </div>
                     <p className="line-clamp-2 text-[12.5px] font-semibold leading-snug">{mainName}</p>
+                    {e.movie && <p className="mt-1 truncate text-[10.5px] font-semibold text-ink-2">🎬 {e.movie.title}</p>}
+                    <span className={`mt-1.5 inline-block rounded-full border px-1.5 py-0.5 text-[9.5px] font-bold ${status.className}`}>
+                      {status.text}
+                    </span>
+                    {e.todayScreenings.length > 0 && (
+                      <div className="mt-1.5 rounded-lg bg-ground px-2 py-1.5 text-[9.5px] leading-relaxed text-ink-2">
+                        <b>오늘 상영</b>
+                        {e.todayScreenings.slice(0, 2).map((screening) => (
+                          <p key={screening.theaterId} className="truncate">
+                            {screening.branchName} · {screening.times.join(", ")}
+                          </p>
+                        ))}
+                        {e.todayScreenings.length > 2 && <p className="text-ink-3">외 {e.todayScreenings.length - 2}곳</p>}
+                      </div>
+                    )}
                     <p className="mt-1 text-[10.5px] text-ink-3">
                       {data ? dday(e.endDate, data.today) : ""}
                       {e.corridorCount > 0
@@ -418,6 +475,17 @@ export default function EventsFeedPage() {
                   ) : (
                     <span className="flex-1 px-2 py-1.5 text-[11px] text-ink-3">영화 연결 없음</span>
                   )}
+                  {e.sourceUrl && (
+                    <a
+                      href={e.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-none border-l border-line-soft px-2 py-1.5 text-[10px] font-semibold text-ink-3 hover:text-app"
+                      title={`원문 · ${checkedAgo(e.lastCheckedAt)}`}
+                    >
+                      출처 ↗
+                    </a>
+                  )}
                   <button
                     onClick={() => hide(e)}
                     className="flex-none px-2 py-1.5 text-[11px] text-ink-3 hover:text-soldout transition-colors"
@@ -426,6 +494,7 @@ export default function EventsFeedPage() {
                     ✕
                   </button>
                 </div>
+                <p className="border-t border-line-soft px-2 py-1 text-[9px] text-ink-3">{checkedAgo(e.lastCheckedAt)}</p>
               </div>
             );
           })}

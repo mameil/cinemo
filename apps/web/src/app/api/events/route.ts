@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@cinemo/shared";
-import { movies, events, goodies, goodsStock, theaters } from "@cinemo/shared";
+import { movies, events, goodies, goodsStock, theaters, screenings } from "@cinemo/shared";
 import { eq, sql } from "drizzle-orm";
 import { isObtainable } from "@/lib/event-rules";
 import { isCorridorBranch } from "@/lib/corridor";
@@ -48,8 +48,10 @@ async function handleGet() {
   const stockRows = await db
     .select({
       eventId: events.id,
+      theaterId: theaters.id,
       branchName: theaters.branchName,
       status: goodsStock.status,
+      updatedAt: goodsStock.updatedAt,
     })
     .from(events)
     .innerJoin(goodies, eq(goodies.eventId, events.id))
@@ -57,18 +59,45 @@ async function handleGet() {
     .innerJoin(theaters, eq(goodsStock.theaterId, theaters.id))
     .where(sql`${events.endDate} >= ${today}`);
 
-  const stockByEvent = new Map<number, { total: Set<string>; corridor: Set<string>; alive: Set<string> }>();
+  const stockByEvent = new Map<number, {
+    total: Set<string>; corridor: Set<string>; alive: Set<string>; latest: string | null;
+  }>();
   for (const s of stockRows) {
     let e = stockByEvent.get(s.eventId);
     if (!e) {
-      e = { total: new Set(), corridor: new Set(), alive: new Set() };
+      e = { total: new Set(), corridor: new Set(), alive: new Set(), latest: null };
       stockByEvent.set(s.eventId, e);
     }
     e.total.add(s.branchName);
+    if (!e.latest || s.updatedAt > e.latest) e.latest = s.updatedAt;
     if (s.status !== "소진") {
       e.alive.add(s.branchName);
       if (isCorridorBranch(s.branchName)) e.corridor.add(s.branchName);
     }
+  }
+
+  // 오늘 상영 회차 — 특전 카드에서 "어디서 몇 시에 받을 수 있는지" 바로 연결.
+  // 현재 이후 회차만 사용하고, 이벤트 재고 지점이 확인된 경우 그 지점으로 제한한다.
+  const now = nowKSTHHMM();
+  const todayRows = await db
+    .select({
+      movieId: screenings.movieId,
+      theaterId: theaters.id,
+      branchName: theaters.branchName,
+      chain: theaters.chain,
+      startTime: screenings.startTime,
+    })
+    .from(screenings)
+    .innerJoin(theaters, eq(screenings.theaterId, theaters.id))
+    .where(sql`${screenings.playDate} = ${today} AND ${screenings.startTime} >= ${now}`)
+    .orderBy(screenings.startTime);
+
+  const screeningsByMovie = new Map<number, typeof todayRows>();
+  for (const row of todayRows) {
+    if (!row.movieId) continue;
+    const list = screeningsByMovie.get(row.movieId) ?? [];
+    list.push(row);
+    screeningsByMovie.set(row.movieId, list);
   }
 
   // 이벤트 단위 조립
@@ -80,6 +109,9 @@ async function handleGet() {
     movie: { id: number; title: string; posterUrl: string | null } | null;
     corridorCount: number; aliveCount: number; totalCount: number;
     allSoldOut: boolean; isNew: boolean; upcoming: boolean;
+    stockState: "confirmed" | "unverified" | "soldout";
+    lastCheckedAt: string;
+    todayScreenings: { theaterId: number; branchName: string; times: string[] }[];
   }>();
 
   const newThreshold = Date.now() - 48 * 3600e3; // 수집 48시간 이내 = NEW
@@ -117,11 +149,41 @@ async function handleGet() {
         allSoldOut: !!st && st.total.size > 0 && st.alive.size === 0,
         isNew: new Date(r.createdAt).getTime() >= newThreshold,
         upcoming: r.startDate > today,
+        stockState: st && st.total.size > 0
+          ? st.alive.size > 0 ? "confirmed" : "soldout"
+          : "unverified",
+        lastCheckedAt: st?.latest ?? r.createdAt,
+        todayScreenings: [],
       };
       map.set(r.eventId, ev);
     }
     if (r.goodieName && !ev.goodieNames.includes(r.goodieName)) ev.goodieNames.push(r.goodieName);
     if (r.goodieType && !ev.types.includes(r.goodieType)) ev.types.push(r.goodieType);
+  }
+
+  for (const ev of map.values()) {
+    if (!ev.movie || ev.upcoming || ev.allSoldOut) continue;
+    const stock = stockByEvent.get(ev.id);
+    const rowsForMovie = screeningsByMovie.get(ev.movie.id) ?? [];
+    const grouped = new Map<number, { theaterId: number; branchName: string; times: string[] }>();
+    for (const row of rowsForMovie) {
+      if (!isCorridorBranch(row.branchName)) continue;
+      // 지점 재고 정보가 있으면 현재 소진되지 않은 진행 지점만 노출.
+      // 지점 정보가 없으면 이벤트 체인과 같은 극장의 회차를 미확인 상태로 제공.
+      if (stock?.total.size) {
+        if (!stock.alive.has(row.branchName)) continue;
+      } else if (row.chain !== ev.chain) {
+        continue;
+      }
+      const group = grouped.get(row.theaterId) ?? {
+        theaterId: row.theaterId,
+        branchName: row.branchName,
+        times: [],
+      };
+      if (group.times.length < 3 && !group.times.includes(row.startTime)) group.times.push(row.startTime);
+      grouped.set(row.theaterId, group);
+    }
+    ev.todayScreenings = [...grouped.values()].slice(0, 3);
   }
 
   // 시작일 최신순 (동일하면 id 내림차순 = 나중 수집 우선)
@@ -135,4 +197,9 @@ async function handleGet() {
 function todayKST(): string {
   const kst = new Date(Date.now() + 9 * 3600e3);
   return kst.toISOString().slice(0, 10);
+}
+
+function nowKSTHHMM(): string {
+  const kst = new Date(Date.now() + 9 * 3600e3);
+  return kst.toISOString().slice(11, 16);
 }
