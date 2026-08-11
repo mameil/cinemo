@@ -19,6 +19,7 @@ interface TheaterResponse {
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 const FAVORITE_THEATERS_KEY = "cinemo-favorite-theaters";
+const STALE_AFTER_MS = 36 * 60 * 60 * 1_000;
 
 type TheaterCard = TheaterInfo & {
   items: ScreeningCard[];
@@ -64,6 +65,12 @@ function updateLabel(updatedAt?: string | null) {
   return `${date.getMonth() + 1}/${date.getDate()} 갱신`;
 }
 
+function needsUpdateReview(updatedAt?: string | null) {
+  if (!updatedAt) return true;
+  const timestamp = new Date(updatedAt).getTime();
+  return !Number.isFinite(timestamp) || Date.now() - timestamp > STALE_AFTER_MS;
+}
+
 function TheaterRow({
   theater,
   selectedDate,
@@ -83,6 +90,7 @@ function TheaterRow({
 }) {
   const hasSchedule = theater.items.length > 0;
   const emptyLabel = theater.scheduleStatus === "closed" ? "쉼" : "일정 미등록";
+  const stale = needsUpdateReview(theater.updatedAt);
   const color = theater.chain === "CGV"
     ? "var(--color-cgv)"
     : theater.chain === "LOTTE"
@@ -107,10 +115,17 @@ function TheaterRow({
         <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: color }} />
         <div className="min-w-0 flex-1">
           <b className="block truncate text-[13px]">{theater.branchName}</b>
-          <small className="text-[10px] text-ink-3">
-            {!hasSchedule ? emptyLabel : theater.next ? `다음 상영 ${theater.next}` : "오늘 상영 종료"}
-          </small>
-          <small className="ml-1 text-[9px] text-ink-3">· {updateLabel(theater.updatedAt)}</small>
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+            <small className="text-[10px] text-ink-3">
+              {!hasSchedule ? emptyLabel : theater.next ? `다음 상영 ${theater.next}` : "오늘 상영 종료"}
+            </small>
+            <small className="text-[9px] text-ink-3">· {updateLabel(theater.updatedAt)}</small>
+            {stale && (
+              <small className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[8.5px] font-bold text-amber-800">
+                정보 확인 필요
+              </small>
+            )}
+          </div>
         </div>
         {hasSchedule && <span className="text-[11px] font-bold text-app">{theater.items.length}회</span>}
         <span className="text-xs text-ink-3">{compareMode ? (compareSelected ? "✓" : "+") : "›"}</span>
