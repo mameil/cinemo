@@ -52,17 +52,37 @@ export default function TimelineView({
   screenings,
   eventPreviews = {},
   isToday = false,
+  selectedDate,
 }: {
   screenings: ScreeningCard[];
   eventPreviews?: Record<string, EventPreview[]>;
   isToday?: boolean;
+  selectedDate: string;
 }) {
   const [range, setRange] = useState<TimeRange>(isToday ? "now" : "all");
   const [peek, setPeek] = useState<PeekTarget | null>(null);
 
   useEffect(() => {
-    setRange(isToday ? "now" : "all");
-  }, [isToday]);
+    const requested = new URLSearchParams(window.location.search).get("range");
+    const valid: TimeRange[] = ["now", "evening", "late", "all"];
+    setRange(valid.includes(requested as TimeRange) ? requested as TimeRange : isToday ? "now" : "all");
+  }, [isToday, selectedDate]);
+
+  useEffect(() => {
+    const restore = () => {
+      const requested = new URLSearchParams(window.location.search).get("range");
+      if (["now", "evening", "late", "all"].includes(requested ?? "")) setRange(requested as TimeRange);
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+
+  const selectRange = (next: TimeRange) => {
+    setRange(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("range", next);
+    window.history.pushState(null, "", `${window.location.pathname}?${params.toString()}`);
+  };
 
   const ranged = useMemo(
     () => screenings.filter((screening) => inRange(screening.startTime, range, isToday)),
@@ -95,7 +115,7 @@ export default function TimelineView({
         ] as const).map(([key, label]) => (
           <button
             key={key}
-            onClick={() => setRange(key)}
+            onClick={() => selectRange(key)}
             className={`flex-none rounded-full border px-3 py-1.5 text-[11.5px] font-bold ${range === key ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
           >
             {label}

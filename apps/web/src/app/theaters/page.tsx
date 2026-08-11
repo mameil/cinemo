@@ -115,7 +115,7 @@ export default function TheatersPage() {
 
   function changeDate(nextDate: string) {
     setSelectedDate(nextDate);
-    router.replace(`/theaters?date=${nextDate}`);
+    router.push(`/theaters?date=${nextDate}`);
   }
 
   return (

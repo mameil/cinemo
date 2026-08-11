@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { ScreeningCard, Chain, EventPreview, GoodieStockLite } from "@mock/types";
 import HomeHeader, { type DateCoverage, type TheaterInfo } from "@/components/HomeHeader";
@@ -48,6 +48,17 @@ function normTitle(s: string) {
   return s.toLowerCase().replace(/\s+/g, "");
 }
 
+function numberSet(value: string | null): Set<number> {
+  if (!value) return new Set();
+  return new Set(value.split(",").map(Number).filter((id) => Number.isInteger(id)));
+}
+
+function chainSet(value: string | null): Set<Chain> {
+  if (!value) return new Set();
+  const valid = new Set<Chain>(["CGV", "LOTTE", "MEGA", "INDIE"]);
+  return new Set(value.split(",").filter((chain): chain is Chain => valid.has(chain as Chain)));
+}
+
 export default function TimetableExplorer({ defaultView = "movie" }: { defaultView?: "movie" | "time" }) {
   const router = useRouter();
   const [initialized, setInitialized] = useState(false);
@@ -71,43 +82,81 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
   const [queryLocation, setQueryLocation] = useState<string | null>(null);
   const [queryTime, setQueryTime] = useState<{ from: string | null; to: string | null; label: string } | null>(null);
   const [queryDateLabel, setQueryDateLabel] = useState<string | null>(null);
+  const restoringUrl = useRef(false);
 
-  // 복원 (마운트 시 1회)
-  useEffect(() => {
-    const saved = loadFilters();
-    const params = new URLSearchParams(window.location.search);
+  const applyUrlState = useCallback((params: URLSearchParams, savedFallback = false) => {
+    const saved = savedFallback ? loadFilters() : null;
     const requestedDate = params.get("date");
-    const requestedView = params.get("view");
-    const requestedQuery = params.get("query");
     const requestedTheater = Number(params.get("theater"));
+    const from = params.get("from");
+    const to = params.get("to");
+
+    setView(defaultView);
+    setSelectedDate(requestedDate && requestedDate >= todayStr() ? requestedDate : saved?.selectedDate && saved.selectedDate >= todayStr() ? saved.selectedDate : todayStr());
+    setAfterNow(params.has("after") ? params.get("after") === "1" : saved?.afterNow ?? defaultView === "time");
+    setGoodieOnly(params.get("goodie") === "1" || (!params.has("goodie") && (saved?.goodieOnly ?? false)));
+    setExcludedTheaters(params.has("hideTheaters") ? numberSet(params.get("hideTheaters")) : new Set(saved?.excludedTheaters ?? []));
+    setExcludedChains(params.has("hideChains") ? chainSet(params.get("hideChains")) : new Set(saved?.excludedChains ?? []));
+    setExcludedMovies(params.has("hideMovies") ? numberSet(params.get("hideMovies")) : new Set(saved?.excludedMovies ?? []));
+    setDirectTheaterId(Number.isInteger(requestedTheater) && requestedTheater > 0 ? requestedTheater : null);
     setInitialShowTheaters(params.get("open") === "theaters");
-    if (saved) {
-      setView(requestedView === "time" || defaultView === "time" ? "time" : saved.view);
-      // 지난 날짜가 복원되면 오늘로 클램프 — 어제 보던 탭을 오늘 열면
-      // 과거 날짜가 선택돼 "지금 이후"가 무력화되고 지난 회차가 그대로 보이던 버그
-      setSelectedDate(requestedDate && requestedDate >= todayStr() ? requestedDate : saved.selectedDate >= todayStr() ? saved.selectedDate : todayStr());
-      // 홈/극장 화면에서 날짜를 명시해 새로 들어온 경우 영화 화면은 하루 전체,
-      // 시간 화면은 지금 이후가 기본이다. 과거 저장 필터로 첫 화면이 비는 것을 막는다.
-      setAfterNow(requestedDate ? defaultView === "time" : saved.afterNow);
-      setGoodieOnly(saved.goodieOnly ?? false);
-      setExcludedTheaters(new Set(saved.excludedTheaters));
-      setExcludedChains(new Set(saved.excludedChains));
-      setExcludedMovies(requestedDate ? new Set() : new Set(saved.excludedMovies));
-    } else {
-      if (requestedDate && requestedDate >= todayStr()) setSelectedDate(requestedDate);
-      if (requestedView === "time" || defaultView === "time") setView("time");
-    }
-    if (requestedQuery) setQueryMovie(requestedQuery);
+    setQueryMovie(params.get("q") ?? params.get("query"));
+    setQueryLocation(params.get("location"));
+    setQueryTime(from || to ? { from, to, label: [from, to].filter(Boolean).join("~") } : null);
+    setQueryDateLabel(null);
+
     if (Number.isInteger(requestedTheater) && requestedTheater > 0) {
-      setDirectTheaterId(requestedTheater);
-      // 극장 화면에서 한 곳을 명시해 들어온 경우 과거에 저장한 숨김 필터보다
-      // 직접 선택을 우선한다. 그렇지 않으면 선택한 극장이 빈 화면으로 보일 수 있다.
       setExcludedTheaters(new Set());
       setExcludedChains(new Set());
       setExcludedMovies(new Set());
     }
-    setInitialized(true);
   }, [defaultView]);
+
+  // 복원 (마운트 시 1회)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hasUrlFilters = ["theater", "hideTheaters", "hideChains", "hideMovies", "goodie", "after", "q", "query", "location", "from", "to"].some((key) => params.has(key));
+    restoringUrl.current = true;
+    applyUrlState(params, !hasUrlFilters && !params.has("date"));
+    setInitialized(true);
+  }, [applyUrlState]);
+
+  // 필터 상태를 공유 가능한 URL로 기록한다. 브라우저 뒤로 가기에서는 URL 상태를
+  // 복원하고, 복원 직후 다시 history를 추가하지 않는다.
+  useEffect(() => {
+    if (!initialized) return;
+    if (restoringUrl.current) {
+      restoringUrl.current = false;
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    params.set("date", selectedDate);
+    params.delete("query");
+    params.delete("view");
+    params.delete("open");
+    const setOrDelete = (key: string, value: string | null) => value ? params.set(key, value) : params.delete(key);
+    setOrDelete("theater", directTheaterId ? String(directTheaterId) : null);
+    setOrDelete("hideTheaters", excludedTheaters.size ? [...excludedTheaters].sort((a, b) => a - b).join(",") : null);
+    setOrDelete("hideChains", excludedChains.size ? [...excludedChains].sort().join(",") : null);
+    setOrDelete("hideMovies", excludedMovies.size ? [...excludedMovies].sort((a, b) => a - b).join(",") : null);
+    setOrDelete("goodie", goodieOnly ? "1" : null);
+    setOrDelete("after", afterNow ? "1" : null);
+    setOrDelete("q", queryMovie);
+    setOrDelete("location", queryLocation);
+    setOrDelete("from", queryTime?.from ?? null);
+    setOrDelete("to", queryTime?.to ?? null);
+    const query = params.toString();
+    window.history.pushState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+  }, [initialized, selectedDate, directTheaterId, excludedTheaters, excludedChains, excludedMovies, goodieOnly, afterNow, queryMovie, queryLocation, queryTime]);
+
+  useEffect(() => {
+    const restore = () => {
+      restoringUrl.current = true;
+      applyUrlState(new URLSearchParams(window.location.search));
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [applyUrlState]);
 
   // 저장 (필터 변경 시)
   useEffect(() => {
@@ -241,7 +290,9 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
 
   const handleViewChange = useCallback((nextView: "movie" | "time") => {
     setView(nextView);
-    router.push(`${nextView === "time" ? "/timeline" : "/movies"}?date=${selectedDate}`);
+    const params = new URLSearchParams(window.location.search);
+    params.set("date", selectedDate);
+    router.push(`${nextView === "time" ? "/timeline" : "/movies"}?${params.toString()}`);
   }, [router, selectedDate]);
 
   // 쿼리 장소 → 극장 id 집합
@@ -458,7 +509,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
           isToday={isToday}
         />
       ) : (
-        <TimelineView screenings={filtered} eventPreviews={data?.eventPreviews} isToday={isToday} />
+        <TimelineView screenings={filtered} eventPreviews={data?.eventPreviews} isToday={isToday} selectedDate={selectedDate} />
       )}
 
       {/* 최근 배포 정보 — 빌드 시점에 구워짐 */}

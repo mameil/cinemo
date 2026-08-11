@@ -79,8 +79,10 @@ export default function EventsFeedPage() {
   // 영화 연결된 건 영화 단위로, 없는 건(제휴·극장 등) 이벤트 단위로 숨긴다
   const [excludedMovies, setExcludedMovies] = useState<Set<number>>(new Set());
   const [excludedEvents, setExcludedEvents] = useState<Set<number>>(new Set());
+  const [navDate, setNavDate] = useState<string | undefined>();
 
   useEffect(() => {
+    setNavDate(new URLSearchParams(window.location.search).get("date") ?? undefined);
     try {
       const m = sessionStorage.getItem("cinemo-feed-excluded");
       if (m) setExcludedMovies(new Set(JSON.parse(m) as number[]));
@@ -186,7 +188,7 @@ export default function EventsFeedPage() {
     <main className="mx-auto max-w-[980px]">
       {/* 상단 네비 */}
       <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-white/95 px-3.5 py-2.5 backdrop-blur-sm">
-        <Link href="/" className="text-lg">←</Link>
+        <Link href={navDate ? `/?date=${navDate}` : "/"} className="text-lg">←</Link>
         <b className="text-[15px]">🎁 특전</b>
         <span className="text-[11px] text-ink-3">받을 수 있는 특전부터</span>
         {/* 카드/리스트 토글 */}
@@ -502,7 +504,7 @@ export default function EventsFeedPage() {
       )}
 
       {peek && <EventPeek target={peek} onClose={() => setPeek(null)} />}
-      <AppNav active="events" />
+      <AppNav active="events" date={navDate} />
     </main>
   );
 }

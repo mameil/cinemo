@@ -59,6 +59,16 @@ export default function DiscoverHome() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
+    const restoreDate = () => {
+      const requested = new URLSearchParams(window.location.search).get("date");
+      setSelectedDate(requested && requested >= localDateString() ? requested : localDateString());
+    };
+    restoreDate();
+    window.addEventListener("popstate", restoreDate);
+    return () => window.removeEventListener("popstate", restoreDate);
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
     setError(false);
     fetch(`/api/screenings?date=${selectedDate}&view=home`)
@@ -81,6 +91,11 @@ export default function DiscoverHome() {
     const query = search.trim();
     if (!query) return;
     router.push(`/movies?date=${selectedDate}&query=${encodeURIComponent(query)}`);
+  }
+
+  function changeDate(date: string) {
+    setSelectedDate(date);
+    window.history.pushState(null, "", `/?date=${date}`);
   }
 
   return (
@@ -115,7 +130,7 @@ export default function DiscoverHome() {
             return (
               <button
                 key={item.date}
-                onClick={() => setSelectedDate(item.date)}
+                onClick={() => changeDate(item.date)}
                 className={`flex-none rounded-xl border px-3 py-1.5 text-center ${active ? "border-ink bg-ink text-white" : "border-line bg-panel text-ink"}`}
               >
                 <small className={`block text-[10px] ${active ? "text-white/70" : "text-ink-3"}`}>{item.label}</small>

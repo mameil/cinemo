@@ -9,7 +9,7 @@ export default function AppNav({ active, date }: { active: NavKey; date?: string
     { key: "movies", label: "영화", href: `/movies${query}` },
     { key: "theaters", label: "극장", href: `/theaters${query}` },
     { key: "timeline", label: "시간", href: `/timeline${query}` },
-    { key: "events", label: "특전", href: "/events" },
+    { key: "events", label: "특전", href: `/events${query}` },
   ];
 
   return (
