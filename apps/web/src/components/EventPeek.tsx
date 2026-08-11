@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { EventPreview } from "@mock/types";
 import { GOODIE_BADGE_CLASS } from "@/lib/utils";
 
@@ -22,17 +22,55 @@ export interface PeekTarget {
  * 굿즈 개별 이미지가 없어 이벤트 배너로 대신한다 (롯데·메가 제공, CGV 미제공).
  */
 export default function EventPeek({ target, onClose }: { target: PeekTarget; onClose: () => void }) {
-  // ESC 닫기 + 배경 스크롤 잠금
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // 초점 이동·가두기 + ESC 닫기 + 배경 스크롤 잠금
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButtonRef.current?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+      )].filter((element) => !element.hasAttribute("aria-hidden"));
+      if (focusable.length === 0) {
+        e.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
+      previousFocusRef.current?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   const items = target.entries.flatMap(({ chain, previews }) =>
     previews
@@ -46,13 +84,18 @@ export default function EventPeek({ target, onClose }: { target: PeekTarget; onC
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className="w-full sm:max-w-[420px] max-h-[82dvh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-panel shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
         <div className="sticky top-0 flex items-center gap-2 border-b border-line bg-panel/95 backdrop-blur-sm px-4 py-3">
           <div className="min-w-0">
-            <b className="block truncate text-[14px]">{target.movieTitle}</b>
+            <b id={titleId} className="block truncate text-[14px]">{target.movieTitle}</b>
             <span className="text-[11px] text-ink-3">
               특전 미리보기
               {target.theaterName ? ` · ${target.theaterName}` : ""}
@@ -60,6 +103,7 @@ export default function EventPeek({ target, onClose }: { target: PeekTarget; onC
             </span>
           </div>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             className="ml-auto flex h-7 w-7 flex-none items-center justify-center rounded-full bg-ground text-[13px] text-ink-2"
             aria-label="닫기"
