@@ -15,7 +15,11 @@ export async function withDbRetry<T>(fn: () => PromiseLike<T>, attempts = 3): Pr
   throw lastErr;
 }
 
-/** 스냅샷 데이터(3시간 주기 크롤)용 CDN 캐시 — Turso 장애 시에도 캐시로 버팀 */
+/**
+ * 읽기 전용 스냅샷 API 캐시.
+ * 브라우저에는 저장하지 않고 공유 CDN에서 5분 재사용하며, DB 순간 장애 때는
+ * 최대 1시간 기존 응답을 제공한다. 관리자 쓰기 API에는 사용하지 않는다.
+ */
 export const SNAPSHOT_CACHE_HEADERS = {
-  "Cache-Control": "s-maxage=60, stale-while-revalidate=300",
+  "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=3600",
 };
