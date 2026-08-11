@@ -183,13 +183,13 @@ export default function HomeHeader({
   }, [showMobileFilters]);
 
   return (
-    <div className="sticky top-0 z-10 border-b border-line bg-white/95 backdrop-blur-sm px-4 pt-3.5 pb-2.5">
+    <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 pt-3.5 pb-2.5">
       {/* 0행: 쿼리 한 줄 */}
       {queryBar && <div className="mb-2.5">{queryBar}</div>}
 
       {/* 1행: 제목 + 신선도 */}
-      <div className="flex items-start gap-2">
-        <div>
+      <div className="flex min-w-0 items-start gap-2">
+        <div className="min-w-0 flex-1">
           <h1 className="text-lg font-extrabold tracking-tight">지금 상영 시간표</h1>
           <button
             onClick={() => {
@@ -211,7 +211,7 @@ export default function HomeHeader({
         <button
           onClick={onRefresh}
           disabled={refreshing}
-          className="ml-auto text-right text-[10.5px] leading-snug text-ink-3 whitespace-nowrap hover:text-app transition-colors disabled:opacity-50"
+          className="max-w-[48%] flex-none text-right text-[10.5px] leading-snug text-ink-3 hover:text-app transition-colors disabled:opacity-50"
         >
           <span className={refreshing ? "inline-block animate-spin" : ""}>↻</span>
           {" "}상영 {hhmm(updated)} · {ago(updated)}
