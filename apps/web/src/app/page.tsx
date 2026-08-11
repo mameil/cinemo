@@ -1,10 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ScreeningCard } from "@mock/types";
-import type { DateCoverage, TheaterInfo } from "@/components/HomeHeader";
+import type { DateCoverage } from "@/components/HomeHeader";
 import AppNav from "@/components/AppNav";
 
 interface HomeResponse {
@@ -12,24 +12,24 @@ interface HomeResponse {
   coverage: {
     label: string;
     theaterCount: number;
-    theaters?: TheaterInfo[];
     maxDate?: string | null;
     dateCoverage?: DateCoverage[];
   };
   updatedAt: string;
   goodsUpdatedAt: string;
-  screenings: ScreeningCard[];
+  upcomingMovies: ScreeningCard[];
+  goodieMovies: ScreeningCard[];
+  indieTheaters: {
+    theater: ScreeningCard["theater"];
+    screeningCount: number;
+    next: string | null;
+  }[];
 }
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
 function localDateString(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function nowHHMM() {
-  const now = new Date();
-  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
 function buildDates(maxDate?: string | null) {
@@ -61,7 +61,7 @@ export default function DiscoverHome() {
   useEffect(() => {
     setLoading(true);
     setError(false);
-    fetch(`/api/screenings?date=${selectedDate}`)
+    fetch(`/api/screenings?date=${selectedDate}&view=home`)
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
@@ -75,52 +75,6 @@ export default function DiscoverHome() {
   const coverageByDate = new Map((data?.coverage.dateCoverage ?? []).map((item) => [item.date, item]));
   const selectedCoverage = coverageByDate.get(selectedDate);
   const isToday = selectedDate === localDateString();
-
-  const upcomingMovies = useMemo(() => {
-    if (!data) return [];
-    const cutoff = isToday ? nowHHMM() : "00:00";
-    const byMovie = new Map<number, ScreeningCard>();
-    for (const screening of data.screenings) {
-      if (screening.startTime < cutoff) continue;
-      const current = byMovie.get(screening.movie.id);
-      if (!current || screening.startTime < current.startTime) byMovie.set(screening.movie.id, screening);
-    }
-    return [...byMovie.values()].sort((a, b) => a.startTime.localeCompare(b.startTime)).slice(0, 6);
-  }, [data, isToday]);
-
-  const goodieMovies = useMemo(() => {
-    if (!data) return [];
-    const byMovie = new Map<number, ScreeningCard>();
-    for (const screening of data.screenings) {
-      if (!screening.hasEvent || byMovie.has(screening.movie.id)) continue;
-      byMovie.set(screening.movie.id, screening);
-    }
-    return [...byMovie.values()].slice(0, 5);
-  }, [data]);
-
-  const indieTheaters = useMemo(() => {
-    if (!data) return [];
-    const map = new Map<number, { theater: ScreeningCard["theater"]; items: ScreeningCard[] }>();
-    for (const screening of data.screenings) {
-      if (screening.theater.chain !== "INDIE") continue;
-      const group = map.get(screening.theater.id) ?? { theater: screening.theater, items: [] };
-      group.items.push(screening);
-      map.set(screening.theater.id, group);
-    }
-    const cutoff = isToday ? nowHHMM() : "00:00";
-    return [...map.values()]
-      .map((group) => ({
-        ...group,
-        next: group.items.map((item) => item.startTime).filter((time) => time >= cutoff).sort()[0] ?? null,
-      }))
-      .sort((a, b) => {
-        if (a.next && b.next) return a.next.localeCompare(b.next);
-        if (a.next) return -1;
-        if (b.next) return 1;
-        return a.theater.branchName.localeCompare(b.theater.branchName);
-      })
-      .slice(0, 5);
-  }, [data, isToday]);
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();
@@ -222,9 +176,9 @@ export default function DiscoverHome() {
                 </div>
                 <Link href={`/movies?date=${selectedDate}`} className="text-xs font-bold text-app">전체 보기 →</Link>
               </div>
-              {upcomingMovies.length > 0 ? (
+              {data && data.upcomingMovies.length > 0 ? (
                 <div className="flex gap-3 overflow-x-auto pb-2">
-                  {upcomingMovies.map((screening) => (
+                  {data.upcomingMovies.map((screening) => (
                     <Link key={screening.movie.id} href={`/movies/${screening.movie.id}`} className="w-[112px] flex-none">
                       {screening.movie.posterUrl ? (
                         <img src={screening.movie.posterUrl.replace("/w500/", "/w200/")} alt={`${screening.movie.title} 포스터`} className="h-[160px] w-[112px] rounded-xl bg-line-soft object-cover shadow-sm" />
@@ -240,7 +194,7 @@ export default function DiscoverHome() {
               ) : <p className="rounded-xl bg-ground p-4 text-center text-xs text-ink-3">남은 상영이 없어요</p>}
             </section>
 
-            {goodieMovies.length > 0 && (
+            {data && data.goodieMovies.length > 0 && (
               <section>
                 <div className="mb-2.5 flex items-end justify-between">
                   <div>
@@ -250,7 +204,7 @@ export default function DiscoverHome() {
                   <Link href="/events" className="text-xs font-bold text-goodie">특전 전체 →</Link>
                 </div>
                 <div className="flex gap-2.5 overflow-x-auto pb-2">
-                  {goodieMovies.map((screening) => (
+                  {data.goodieMovies.map((screening) => (
                     <Link key={screening.movie.id} href={`/movies/${screening.movie.id}`} className="flex w-[230px] flex-none gap-3 rounded-2xl border border-goodie-line bg-goodie-tint/40 p-2.5">
                       {screening.movie.posterUrl ? (
                         <img src={screening.movie.posterUrl.replace("/w500/", "/w200/")} alt={`${screening.movie.title} 포스터`} className="h-[84px] w-[58px] rounded-lg object-cover" />
@@ -277,12 +231,12 @@ export default function DiscoverHome() {
                 <Link href={`/theaters?date=${selectedDate}`} className="text-xs font-bold text-app">전체 보기 →</Link>
               </div>
               <div className="overflow-hidden rounded-2xl border border-line bg-panel">
-                {indieTheaters.map((group) => (
-                  <Link key={group.theater.id} href={`/movies?date=${selectedDate}&theater=${group.theater.id}`} className="flex items-center gap-3 border-b border-line-soft px-3.5 py-3 last:border-b-0 hover:bg-ground">
+                {data?.indieTheaters.map((group) => (
+                  <Link key={group.theater.id} href={`/timeline?date=${selectedDate}&theater=${group.theater.id}`} className="flex items-center gap-3 border-b border-line-soft px-3.5 py-3 last:border-b-0 hover:bg-ground">
                     <span className="h-2.5 w-2.5 flex-none rounded-full bg-[#555]" />
                     <b className="min-w-0 flex-1 truncate text-[13px]">{group.theater.branchName}</b>
                     <span className="text-[11px] text-ink-3">{group.next ? `다음 ${group.next}` : "오늘 상영 종료"}</span>
-                    <span className="w-8 text-right text-[11px] font-bold text-app">{group.items.length}회</span>
+                    <span className="w-8 text-right text-[11px] font-bold text-app">{group.screeningCount}회</span>
                   </Link>
                 ))}
               </div>

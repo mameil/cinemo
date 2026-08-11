@@ -27,6 +27,7 @@ async function handleGet(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const today = todayKST();
   const date = searchParams.get("date") ?? today;
+  const homeSummary = searchParams.get("view") === "home";
 
   // 지역 키워드 필터 (포함 + 제외)
   const includeFilter = or(
@@ -366,6 +367,73 @@ async function handleGet(req: NextRequest) {
 
   const maxDate = dateCoverage.at(-1)?.date ?? null;
 
+  if (homeSummary) {
+    const cutoff = date === today ? nowKSTHHMM() : "00:00";
+    const upcomingMovies: ScreeningCard[] = [];
+    const seenUpcoming = new Set<number>();
+    const goodieMovies: ScreeningCard[] = [];
+    const seenGoodies = new Set<number>();
+    const indieMap = new Map<number, { theater: ScreeningCard["theater"]; screeningCount: number; next: string | null }>();
+
+    for (const card of cards) {
+      if (
+        upcomingMovies.length < 6 &&
+        card.startTime >= cutoff &&
+        !seenUpcoming.has(card.movie.id)
+      ) {
+        seenUpcoming.add(card.movie.id);
+        upcomingMovies.push(card);
+      }
+
+      if (goodieMovies.length < 5 && card.hasEvent && !seenGoodies.has(card.movie.id)) {
+        seenGoodies.add(card.movie.id);
+        goodieMovies.push(card);
+      }
+
+      if (card.theater.chain === "INDIE") {
+        const summary = indieMap.get(card.theater.id) ?? {
+          theater: card.theater,
+          screeningCount: 0,
+          next: null,
+        };
+        summary.screeningCount += 1;
+        if (card.startTime >= cutoff && (!summary.next || card.startTime < summary.next)) {
+          summary.next = card.startTime;
+        }
+        indieMap.set(card.theater.id, summary);
+      }
+    }
+
+    const indieTheaters = [...indieMap.values()]
+      .sort((a, b) => {
+        if (a.next && b.next) return a.next.localeCompare(b.next);
+        if (a.next) return -1;
+        if (b.next) return 1;
+        return a.theater.branchName.localeCompare(b.theater.branchName);
+      })
+      .slice(0, 5);
+
+    return NextResponse.json({
+      date,
+      coverage: {
+        label: "파주 · 일산 · 고양 · 서울 서부",
+        theaterCount: theaterInfoMap.size,
+        maxDate,
+        dateCoverage: dateCoverage.map((item) => ({
+          date: item.date,
+          screeningCount: Number(item.screeningCount),
+          theaterCount: Number(item.theaterCount),
+          indieTheaterCount: Number(item.indieTheaterCount),
+        })),
+      },
+      updatedAt: latestUpdate || new Date().toISOString(),
+      goodsUpdatedAt: goodsUpdatedAt || new Date().toISOString(),
+      upcomingMovies,
+      goodieMovies,
+      indieTheaters,
+    }, { headers: SNAPSHOT_CACHE_HEADERS });
+  }
+
   const result = {
     date,
     coverage: {
@@ -396,6 +464,11 @@ function todayKST(): string {
   // KST = UTC+9
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
   return kst.toISOString().slice(0, 10);
+}
+
+function nowKSTHHMM(): string {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(11, 16);
 }
 
 function addDays(date: string, days: number): string {
