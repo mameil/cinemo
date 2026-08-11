@@ -17,6 +17,15 @@ interface TimelineGroup {
   firstTime: string;
 }
 
+function theaterRegion(screening: ScreeningCard) {
+  if (screening.theater.chain === "INDIE") return "독립영화관";
+  const region = screening.theater.region ?? "";
+  if (region.includes("서울")) return "서울";
+  if (region.includes("경기")) return "경기";
+  if (region.includes("인천")) return "인천";
+  return "기타";
+}
+
 function currentTime() {
   const now = new Date();
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -29,7 +38,12 @@ function inRange(time: string, range: TimeRange, isToday: boolean) {
   return true;
 }
 
-function groupScreenings(screenings: ScreeningCard[], favoriteTheaters: Set<number>, favoritesFirst: boolean): TimelineGroup[] {
+function groupScreenings(
+  screenings: ScreeningCard[],
+  favoriteTheaters: Set<number>,
+  favoritesFirst: boolean,
+  priorityRegion: string | null,
+): TimelineGroup[] {
   const map = new Map<string, TimelineGroup>();
   for (const screening of screenings) {
     const key = `${screening.movie.id}-${screening.theater.id}`;
@@ -51,6 +65,10 @@ function groupScreenings(screenings: ScreeningCard[], favoriteTheaters: Set<numb
         const favoriteOrder = Number(favoriteTheaters.has(b.theater.id)) - Number(favoriteTheaters.has(a.theater.id));
         if (favoriteOrder !== 0) return favoriteOrder;
       }
+      if (priorityRegion) {
+        const regionOrder = Number(theaterRegion(b.items[0]) === priorityRegion) - Number(theaterRegion(a.items[0]) === priorityRegion);
+        if (regionOrder !== 0) return regionOrder;
+      }
       return a.firstTime.localeCompare(b.firstTime);
     });
 }
@@ -70,6 +88,7 @@ export default function TimelineView({
   const [peek, setPeek] = useState<PeekTarget | null>(null);
   const [favoriteTheaters, setFavoriteTheaters] = useState<Set<number>>(new Set());
   const [favoritesFirst, setFavoritesFirst] = useState(false);
+  const [priorityRegion, setPriorityRegion] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -84,14 +103,18 @@ export default function TimelineView({
 
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("range");
+    const requestedRegion = new URLSearchParams(window.location.search).get("priorityRegion");
     const valid: TimeRange[] = ["now", "evening", "late", "all"];
     setRange(valid.includes(requested as TimeRange) ? requested as TimeRange : isToday ? "now" : "all");
+    setPriorityRegion(requestedRegion);
   }, [isToday, selectedDate]);
 
   useEffect(() => {
     const restore = () => {
-      const requested = new URLSearchParams(window.location.search).get("range");
+      const params = new URLSearchParams(window.location.search);
+      const requested = params.get("range");
       if (["now", "evening", "late", "all"].includes(requested ?? "")) setRange(requested as TimeRange);
+      setPriorityRegion(params.get("priorityRegion"));
     };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
@@ -104,13 +127,25 @@ export default function TimelineView({
     window.history.pushState(null, "", `${window.location.pathname}?${params.toString()}`);
   };
 
+  const selectPriorityRegion = (next: string | null) => {
+    setPriorityRegion(next);
+    const params = new URLSearchParams(window.location.search);
+    if (next) params.set("priorityRegion", next);
+    else params.delete("priorityRegion");
+    window.history.pushState(null, "", `${window.location.pathname}?${params.toString()}`);
+  };
+
   const ranged = useMemo(
     () => screenings.filter((screening) => inRange(screening.startTime, range, isToday)),
     [screenings, range, isToday]
   );
+  const regions = useMemo(() => [...new Set(ranged.map(theaterRegion))].sort((a, b) => {
+    const order = ["독립영화관", "서울", "경기", "인천", "기타"];
+    return order.indexOf(a) - order.indexOf(b);
+  }), [ranged]);
   const groups = useMemo(
-    () => groupScreenings(ranged, favoriteTheaters, favoritesFirst),
-    [favoriteTheaters, favoritesFirst, ranged]
+    () => groupScreenings(ranged, favoriteTheaters, favoritesFirst, priorityRegion),
+    [favoriteTheaters, favoritesFirst, priorityRegion, ranged]
   );
 
   const openPeek = (screening: ScreeningCard, type: string | null) => {
@@ -155,6 +190,30 @@ export default function TimelineView({
           </button>
         )}
       </div>
+
+      {regions.length > 1 && (
+        <div className="mb-3 flex items-center gap-1.5 overflow-x-auto">
+          <span className="flex-none text-[10.5px] font-bold text-ink-3">지역 우선</span>
+          <button
+            type="button"
+            onClick={() => selectPriorityRegion(null)}
+            className={`flex-none rounded-full border px-2.5 py-1 text-[10.5px] font-bold ${priorityRegion === null ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
+          >
+            해제
+          </button>
+          {regions.map((region) => (
+            <button
+              key={region}
+              type="button"
+              onClick={() => selectPriorityRegion(region)}
+              aria-pressed={priorityRegion === region}
+              className={`flex-none rounded-full border px-2.5 py-1 text-[10.5px] font-bold ${priorityRegion === region ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
+            >
+              {region}
+            </button>
+          ))}
+        </div>
+      )}
 
       {groups.length === 0 ? (
         <div className="rounded-xl bg-ground py-10 text-center text-sm text-ink-3">이 시간대에 상영이 없어요</div>
