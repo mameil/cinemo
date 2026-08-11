@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Coverage, Chain } from "@mock/types";
 
@@ -117,6 +117,7 @@ export default function HomeHeader({
 }: Props) {
   const [showTheaters, setShowTheaters] = useState(initialShowTheaters);
   const [showMovies, setShowMovies] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const updated = new Date(updatedAt);
   const goodsUpdated = new Date(goodsUpdatedAt);
 
@@ -150,6 +151,26 @@ export default function HomeHeader({
   }
 
   const activeCount = (coverage.theaters ?? []).filter((t) => !excludedTheaters.has(t.id)).length;
+  const activeMovieCount = movies.filter((movie) => !excludedMovies.has(movie.id)).length;
+  const filterCount = Number(excludedChains.size > 0)
+    + Number(hasTheaterFilter)
+    + Number(hasMovieFilter)
+    + Number(goodieOnly)
+    + Number(view !== "time" && isToday && afterNow);
+
+  useEffect(() => {
+    if (!showMobileFilters) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowMobileFilters(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", close);
+    };
+  }, [showMobileFilters]);
 
   return (
     <div className="sticky top-0 z-10 border-b border-line bg-white/95 backdrop-blur-sm px-4 pt-3.5 pb-2.5">
@@ -161,7 +182,15 @@ export default function HomeHeader({
         <div>
           <h1 className="text-lg font-extrabold tracking-tight">지금 상영 시간표</h1>
           <button
-            onClick={() => { setShowTheaters((v) => !v); setShowMovies(false); }}
+            onClick={() => {
+              setShowMovies(false);
+              if (window.matchMedia("(max-width: 639px)").matches) {
+                setShowTheaters(true);
+                setShowMobileFilters(true);
+              } else {
+                setShowTheaters((value) => !value);
+              }
+            }}
             className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-2 hover:text-app transition-colors"
           >
             <span className="text-app">◉</span>
@@ -183,7 +212,7 @@ export default function HomeHeader({
 
       {/* 극장 목록 (지역별 그룹 + 체크박스) */}
       {showTheaters && theatersByArea.size > 0 && (
-        <div className="mt-2 rounded-xl border border-line bg-ground/60 p-3 space-y-3">
+        <div className="mt-2 hidden rounded-xl border border-line bg-ground/60 p-3 space-y-3 sm:block">
           {[...theatersByArea.entries()].map(([area, list]) => {
             const allChecked = list.every((t) => !excludedTheaters.has(t.id));
             const noneChecked = list.every((t) => excludedTheaters.has(t.id));
@@ -240,10 +269,10 @@ export default function HomeHeader({
 
       {/* 영화 골라보기 패널 */}
       {showMovies && movies.length > 0 && (
-        <div className="mt-2 rounded-xl border border-line bg-ground/60 p-3">
+        <div className="mt-2 hidden rounded-xl border border-line bg-ground/60 p-3 sm:block">
           <div className="mb-2.5 flex items-center gap-2">
             <span className="text-[12px] font-bold text-ink-2">
-              영화 ({movies.length - excludedMovies.size}/{movies.length})
+              영화 ({activeMovieCount}/{movies.length})
             </span>
             <div className="ml-auto flex gap-2">
               <button
@@ -274,7 +303,7 @@ export default function HomeHeader({
                       {m.posterUrl ? (
                         <img
                           src={m.posterUrl.replace("/w500/", "/w200/")}
-                          alt=""
+                          alt={`${m.title} 포스터`}
                           className={`h-[72px] w-[50px] rounded-lg object-cover shadow-sm transition-all ${
                             active ? "ring-2 ring-app" : "opacity-60"
                           }`}
@@ -367,15 +396,21 @@ export default function HomeHeader({
           </button>
         </div>
         <Link
-          href="/events"
+          href={`/events?date=${selectedDate}`}
           className="inline-flex items-center gap-1 rounded-full border border-goodie-line bg-goodie-tint/60 px-2.5 py-1 text-xs font-semibold text-goodie transition-colors hover:bg-goodie-tint"
         >
           🎁 특전 피드
         </Link>
+        <button
+          onClick={() => setShowMobileFilters(true)}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-line bg-panel px-3 py-1 text-xs font-bold text-ink-2 sm:hidden"
+        >
+          ⚙ 필터{filterCount > 0 && <span className="rounded-full bg-app px-1.5 text-[9px] text-white">{filterCount}</span>}
+        </button>
         {view !== "time" && (
           <button
             onClick={() => onAfterNowChange(!afterNow)}
-            className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+            className={`ml-auto hidden items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors sm:inline-flex ${
               afterNow && isToday
                 ? "border-app bg-app-tint text-app"
                 : "border-line bg-panel text-ink-3"
@@ -387,7 +422,7 @@ export default function HomeHeader({
       </div>
 
       {/* 체인 필터 + 영화 골라보기 */}
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
+      <div className="mt-2.5 hidden flex-wrap gap-1.5 sm:flex">
         {CHAINS.map((c) => {
           const active = !excludedChains.has(c.key);
           return (
@@ -435,7 +470,7 @@ export default function HomeHeader({
 
       {/* 활성 필터 초기화 바 */}
       {(hasTheaterFilter || hasMovieFilter) && (
-        <div className="mt-2 flex items-center gap-2 text-[11.5px]">
+        <div className="mt-2 hidden items-center gap-2 text-[11.5px] sm:flex">
           <span className="text-ink-3">필터 적용 중:</span>
           {hasTheaterFilter && (
             <button
@@ -461,6 +496,139 @@ export default function HomeHeader({
               전체 초기화
             </button>
           )}
+        </div>
+      )}
+
+      {showMobileFilters && (
+        <div className="fixed inset-0 z-50 sm:hidden">
+          <button
+            className="absolute inset-0 bg-black/35"
+            onClick={() => setShowMobileFilters(false)}
+            aria-label="필터 닫기"
+          />
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label="상세 필터"
+            className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-3xl bg-white px-4 pb-7 pt-3 shadow-2xl"
+          >
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" />
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-extrabold">상세 필터</h2>
+              {filterCount > 0 && <span className="rounded-full bg-app-tint px-2 py-0.5 text-[10px] font-bold text-app">{filterCount}개 적용</span>}
+              <button onClick={() => setShowMobileFilters(false)} className="ml-auto rounded-full bg-ground px-3 py-1 text-xs font-bold text-ink-2">완료</button>
+            </div>
+
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-bold text-ink-2">영화관 체인</p>
+              <div className="flex flex-wrap gap-1.5">
+                {CHAINS.map((chain) => {
+                  const active = !excludedChains.has(chain.key);
+                  return (
+                    <button
+                      key={chain.key}
+                      onClick={() => onToggleChain(chain.key)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-app bg-app-tint text-app" : "border-line bg-ground text-ink-3 opacity-55"}`}
+                    >
+                      {chain.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                onClick={() => onGoodieOnlyChange(!goodieOnly)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-bold ${goodieOnly ? "border-goodie bg-goodie-tint text-goodie" : "border-line bg-panel text-ink-2"}`}
+              >
+                🎁 특전만
+              </button>
+              {view !== "time" && isToday && (
+                <button
+                  onClick={() => onAfterNowChange(!afterNow)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-bold ${afterNow ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-2"}`}
+                >
+                  🕒 지금 이후
+                </button>
+              )}
+              <button
+                onClick={() => { setShowTheaters((value) => !value); setShowMovies(false); }}
+                className={`rounded-full border px-3 py-1.5 text-xs font-bold ${showTheaters || hasTheaterFilter ? "border-app bg-app-tint text-app" : "border-line"}`}
+              >
+                🏠 극장 선택
+              </button>
+              <button
+                onClick={() => { setShowMovies((value) => !value); setShowTheaters(false); }}
+                className={`rounded-full border px-3 py-1.5 text-xs font-bold ${showMovies || hasMovieFilter ? "border-app bg-app-tint text-app" : "border-line"}`}
+              >
+                🎬 영화 선택
+              </button>
+            </div>
+
+            {showTheaters && (
+              <div className="mt-4 space-y-4 rounded-2xl bg-ground p-3">
+                {[...theatersByArea.entries()].map(([area, list]) => (
+                  <div key={area}>
+                    <button onClick={() => onToggleArea(area)} className="mb-2 text-xs font-extrabold text-ink-2">
+                      {area} · {list.filter((theater) => !excludedTheaters.has(theater.id)).length}/{list.length}
+                    </button>
+                    <div className="flex flex-wrap gap-1.5">
+                      {list.map((theater) => {
+                        const active = !excludedTheaters.has(theater.id);
+                        return (
+                          <button
+                            key={theater.id}
+                            onClick={() => onToggleTheater(theater.id)}
+                            className={`rounded-lg border px-2 py-1 text-[11px] ${active ? "border-line bg-white text-ink-2" : "border-line-soft text-ink-3 line-through opacity-50"}`}
+                          >
+                            {theater.branchName}{theater.openToday === false && " · 쉼"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showMovies && movies.length > 0 && (
+              <div className="mt-4 rounded-2xl bg-ground p-3">
+                <div className="mb-2 flex items-center text-xs font-bold">
+                  영화 {activeMovieCount}/{movies.length}
+                  <button onClick={onResetMovies} className="ml-auto text-app">전체 선택</button>
+                  <button onClick={onExcludeAllMovies} className="ml-3 text-ink-3">전체 해제</button>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {movies.map((movie) => {
+                    const active = !excludedMovies.has(movie.id);
+                    return (
+                      <button key={movie.id} onClick={() => onToggleMovie(movie.id)} className="w-[58px] flex-none">
+                        {movie.posterUrl ? (
+                          <img src={movie.posterUrl.replace("/w500/", "/w200/")} alt={`${movie.title} 포스터`} className={`h-[78px] w-[54px] rounded-lg object-cover ${active ? "ring-2 ring-app" : "opacity-45"}`} />
+                        ) : <div className={`flex h-[78px] w-[54px] items-center justify-center rounded-lg bg-line-soft ${active ? "ring-2 ring-app" : "opacity-45"}`}>🎞️</div>}
+                        <span className="mt-1 block truncate text-[9.5px]">{movie.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {filterCount > 0 && (
+              <button
+                onClick={() => {
+                  onResetTheaters();
+                  onResetMovies();
+                  onGoodieOnlyChange(false);
+                  if (afterNow) onAfterNowChange(false);
+                }}
+                className="mt-5 w-full rounded-xl border border-line py-2.5 text-sm font-bold text-soldout"
+              >
+                필터 전체 초기화
+              </button>
+            )}
+          </section>
         </div>
       )}
     </div>
