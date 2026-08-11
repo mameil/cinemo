@@ -307,7 +307,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     if (queryTime?.to) {
       list = list.filter((s) => s.startTime <= queryTime.to!);
     }
-    if (afterNow && isToday) {
+    if (afterNow && isToday && view !== "time") {
       const now = nowHHMM();
       list = list.filter((s) => s.startTime >= now);
     }
@@ -317,7 +317,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     }
 
     return list;
-  }, [data, directTheaterId, excludedTheaters, excludedChains, queryTheaterIds, queryTime, afterNow, isToday, goodieOnly]);
+  }, [data, directTheaterId, excludedTheaters, excludedChains, queryTheaterIds, queryTime, afterNow, isToday, goodieOnly, view]);
 
   // 선택된 극장에서 실제 상영 중인 영화만
   const availableMovies = useMemo(() => {
@@ -458,7 +458,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
           isToday={isToday}
         />
       ) : (
-        <TimelineView screenings={filtered} eventPreviews={data?.eventPreviews} />
+        <TimelineView screenings={filtered} eventPreviews={data?.eventPreviews} isToday={isToday} />
       )}
 
       {/* 최근 배포 정보 — 빌드 시점에 구워짐 */}

@@ -1,161 +1,200 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { ScreeningCard, EventPreview } from "@mock/types";
 import { CHAIN_COLOR, GOODIE_BADGE_CLASS, seatStatus, formatLabel, timeSlot } from "@/lib/utils";
 import EventPeek, { type PeekTarget } from "@/components/EventPeek";
-import Link from "next/link";
+
+type TimeRange = "now" | "evening" | "late" | "all";
+
+interface TimelineGroup {
+  key: string;
+  movie: ScreeningCard["movie"];
+  theater: ScreeningCard["theater"];
+  items: ScreeningCard[];
+  firstTime: string;
+}
+
+function currentTime() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+function inRange(time: string, range: TimeRange, isToday: boolean) {
+  if (range === "now") return !isToday || time >= currentTime();
+  if (range === "evening") return time >= "17:00" && time < "22:00";
+  if (range === "late") return time >= "22:00" || time < "05:00";
+  return true;
+}
+
+function groupScreenings(screenings: ScreeningCard[]): TimelineGroup[] {
+  const map = new Map<string, TimelineGroup>();
+  for (const screening of screenings) {
+    const key = `${screening.movie.id}-${screening.theater.id}`;
+    const group = map.get(key) ?? {
+      key,
+      movie: screening.movie,
+      theater: screening.theater,
+      items: [],
+      firstTime: screening.startTime,
+    };
+    group.items.push(screening);
+    if (screening.startTime < group.firstTime) group.firstTime = screening.startTime;
+    map.set(key, group);
+  }
+  return [...map.values()]
+    .map((group) => ({ ...group, items: group.items.sort((a, b) => a.startTime.localeCompare(b.startTime)) }))
+    .sort((a, b) => a.firstTime.localeCompare(b.firstTime));
+}
 
 export default function TimelineView({
   screenings,
   eventPreviews = {},
+  isToday = false,
 }: {
   screenings: ScreeningCard[];
   eventPreviews?: Record<string, EventPreview[]>;
+  isToday?: boolean;
 }) {
-  const sorted = [...screenings].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const [range, setRange] = useState<TimeRange>(isToday ? "now" : "all");
   const [peek, setPeek] = useState<PeekTarget | null>(null);
 
-  // 배지 클릭 → 카드 링크 이동 대신 미리보기 모달 (이 극장이 진행 극장인 이벤트만)
-  const openPeek = (e: React.MouseEvent, s: ScreeningCard, type: string | null) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const previews = (eventPreviews[`${s.movie.id}-${s.theater.chain}`] ?? []).filter(
-      (p) => p.theaterIds.length === 0 || p.theaterIds.includes(s.theater.id)
+  useEffect(() => {
+    setRange(isToday ? "now" : "all");
+  }, [isToday]);
+
+  const ranged = useMemo(
+    () => screenings.filter((screening) => inRange(screening.startTime, range, isToday)),
+    [screenings, range, isToday]
+  );
+  const groups = useMemo(() => groupScreenings(ranged), [ranged]);
+
+  const openPeek = (screening: ScreeningCard, type: string | null) => {
+    const previews = (eventPreviews[`${screening.movie.id}-${screening.theater.chain}`] ?? []).filter(
+      (preview) => preview.theaterIds.length === 0 || preview.theaterIds.includes(screening.theater.id)
     );
     setPeek({
-      movieTitle: s.movie.title,
+      movieTitle: screening.movie.title,
       type,
-      theaterName: s.theater.branchName,
-      entries: [{ chain: s.theater.chain, previews }],
+      theaterName: screening.theater.branchName,
+      entries: [{ chain: screening.theater.chain, previews }],
     });
   };
 
   let lastSlot = "";
 
   return (
-    <div className="flex flex-col gap-2.5 p-3">
-      {sorted.map((s) => {
-        const slot = timeSlot(s.startTime);
-        const showSlot = slot !== lastSlot;
-        lastSlot = slot;
+    <div className="p-3">
+      <div className="mb-3 flex gap-1.5 overflow-x-auto">
+        {([
+          ["now", isToday ? "지금부터" : "하루 시작부터"],
+          ["evening", "저녁 17~22시"],
+          ["late", "심야 22시 이후"],
+          ["all", "전체"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setRange(key)}
+            className={`flex-none rounded-full border px-3 py-1.5 text-[11.5px] font-bold ${range === key ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-        const status = seatStatus(s.remainingSeats, s.totalSeats);
-        const fmt = formatLabel(s.format);
+      {groups.length === 0 ? (
+        <div className="rounded-xl bg-ground py-10 text-center text-sm text-ink-3">이 시간대에 상영이 없어요</div>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {groups.map((group) => {
+            const slot = timeSlot(group.firstTime);
+            const showSlot = slot !== lastSlot;
+            lastSlot = slot;
+            const eventTypes = [...new Set(group.items.flatMap((item) => item.eventTypes))];
+            const eventScreening = group.items.find((item) => item.hasEvent) ?? group.items[0];
 
-        return (
-          <div key={s.id}>
-            {showSlot && (
-              <div className="flex items-center gap-2 pb-1 pt-1.5 text-xs font-bold tracking-wide text-ink-3">
-                {slot}
-                <span className="h-px flex-1 bg-line" />
-              </div>
-            )}
-            <Link
-              href={`/movies/${s.movie.id}`}
-              className="grid grid-cols-[5px_42px_1fr] overflow-hidden rounded-[14px] border border-line bg-panel transition-transform hover:-translate-y-px hover:shadow-md"
-            >
-              {/* 체인 바 */}
-              <div style={{ background: CHAIN_COLOR[s.theater.chain] }} />
-
-              {/* 포스터 썸네일 */}
-              {s.movie.posterUrl ? (
-                <img
-                  src={s.movie.posterUrl.replace("/w500/", "/w200/")}
-                  alt=""
-                  className="h-full w-[42px] self-stretch object-cover bg-[#dfe4ea]"
-                />
-              ) : (
-                <div className="flex w-[42px] items-center justify-center bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_6px,#eef1f5_6px,#eef1f5_12px)] text-[15px] text-[#aab1bb]">
-                  🎞️
-                </div>
-              )}
-
-              <div className="min-w-0 px-3 py-2.5">
-                {/* 1줄: 시간 + 제목 + 좌석 */}
-                <div className="flex items-baseline gap-2">
-                  <span className="text-[15px] font-extrabold tracking-tight tabular-nums">
-                    {s.startTime}
-                  </span>
-                  <h3 className="min-w-0 flex-1 truncate text-[14.5px] font-semibold tracking-tight">
-                    {s.movie.title}
-                  </h3>
-                  {s.remainingSeats !== null && s.totalSeats !== null && (
-                    <span
-                      className={`flex-none text-[12.5px] font-bold tabular-nums ${
-                        status === "soldout"
-                          ? "text-soldout"
-                          : status === "low"
-                            ? "text-low"
-                            : "text-ink-2"
-                      }`}
-                    >
-                      {s.remainingSeats}
-                      <small className="text-[10.5px] font-medium">
-                        /{s.totalSeats}
-                        {status === "low" && " · 임박"}
-                        {status === "soldout" && " · 매진"}
-                      </small>
-                    </span>
-                  )}
-                </div>
-
-                {/* 2줄: 포맷 · 지점 · 종료시간 */}
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <span
-                    className={`rounded-[5px] px-1.5 py-0.5 text-[10.5px] font-bold ${
-                      fmt.variant === "imax"
-                        ? "bg-[#e5f0fb] text-[#0b5cad]"
-                        : fmt.variant === "premium"
-                          ? "bg-[#f2e9fa] text-[#6d2e9e]"
-                          : "bg-line-soft text-ink-2"
-                    }`}
-                  >
-                    {fmt.label}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-xs text-ink-2">
-                    <span
-                      className="h-[7px] w-[7px] rounded-full"
-                      style={{ background: CHAIN_COLOR[s.theater.chain] }}
-                    />
-                    {s.theater.branchName}
-                  </span>
-                  {s.endTime && (
-                    <span className="text-[11px] tabular-nums text-ink-3">
-                      ~{s.endTime}
-                      {s.subtitleDub && ` · ${s.subtitleDub}`}
-                    </span>
-                  )}
-                </div>
-
-                {/* 3줄: 특전 배지 */}
-                {s.hasEvent && s.eventTypes.length > 0 && (
-                  <div className="mt-1.5 flex items-center gap-1.5">
-                    <span className="text-[11px]">🎁</span>
-                    {s.eventTypes.slice(0, 2).map((t) => (
-                      <button
-                        key={t}
-                        onClick={(e) => openPeek(e, s, t)}
-                        className={`rounded-md border px-1.5 py-px text-[10.5px] font-bold transition-colors cursor-pointer ${GOODIE_BADGE_CLASS}`}
-                      >
-                        {t === "기타" ? "현장이벤트" : t}
-                      </button>
-                    ))}
-                    {s.eventTypes.length > 2 && (
-                      <button
-                        onClick={(e) => openPeek(e, s, null)}
-                        className="text-[10.5px] font-semibold text-ink-3 hover:text-app"
-                      >
-                        +{s.eventTypes.length - 2}
-                      </button>
-                    )}
+            return (
+              <div key={group.key}>
+                {showSlot && (
+                  <div className="flex items-center gap-2 pb-1 pt-1.5 text-xs font-bold tracking-wide text-ink-3">
+                    {slot}
+                    <span className="h-px flex-1 bg-line" />
                   </div>
                 )}
+                <div className="grid grid-cols-[5px_42px_1fr] overflow-hidden rounded-[14px] border border-line bg-panel">
+                  <div style={{ background: CHAIN_COLOR[group.theater.chain] }} />
+                  <Link href={`/movies/${group.movie.id}`} className="block">
+                    {group.movie.posterUrl ? (
+                      <img
+                        src={group.movie.posterUrl.replace("/w500/", "/w200/")}
+                        alt={`${group.movie.title} 포스터`}
+                        className="h-full w-[42px] object-cover bg-[#dfe4ea]"
+                      />
+                    ) : (
+                      <div className="flex h-full min-h-20 w-[42px] items-center justify-center bg-line-soft text-[15px]">🎞️</div>
+                    )}
+                  </Link>
+
+                  <div className="min-w-0 px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <Link href={`/movies/${group.movie.id}`} className="min-w-0 flex-1">
+                        <h3 className="truncate text-[14.5px] font-semibold tracking-tight">{group.movie.title}</h3>
+                      </Link>
+                      <span className="flex-none text-[10.5px] text-ink-3">{group.items.length}회</span>
+                    </div>
+                    <p className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-2">
+                      <span className="h-[7px] w-[7px] rounded-full" style={{ background: CHAIN_COLOR[group.theater.chain] }} />
+                      {group.theater.branchName}
+                    </p>
+
+                    <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
+                      {group.items.map((screening) => {
+                        const status = seatStatus(screening.remainingSeats, screening.totalSeats);
+                        const format = formatLabel(screening.format);
+                        return (
+                          <div
+                            key={screening.id}
+                            className={`min-w-[58px] flex-none rounded-lg border px-2 py-1 text-center ${status === "soldout" ? "border-line opacity-45" : screening.hasEvent ? "border-goodie-line bg-goodie-tint/60" : "border-line"}`}
+                          >
+                            <b className={`block text-[13px] tabular-nums ${status === "soldout" ? "line-through" : ""}`}>{screening.startTime}</b>
+                            <small className="block truncate text-[8.5px] text-ink-3">{format.label}</small>
+                            {screening.remainingSeats !== null && screening.totalSeats !== null && (
+                              <small className={`block text-[8.5px] font-semibold ${status === "low" ? "text-low" : status === "soldout" ? "text-soldout" : "text-ink-3"}`}>
+                                {status === "soldout" ? "매진" : `${screening.remainingSeats}/${screening.totalSeats}`}
+                              </small>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {eventTypes.length > 0 && (
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <span className="text-[11px]">🎁</span>
+                        {eventTypes.slice(0, 2).map((type) => (
+                          <button
+                            key={type}
+                            onClick={() => openPeek(eventScreening, type)}
+                            className={`rounded-md border px-1.5 py-px text-[10.5px] font-bold ${GOODIE_BADGE_CLASS}`}
+                          >
+                            {type === "기타" ? "현장이벤트" : type}
+                          </button>
+                        ))}
+                        {eventTypes.length > 2 && (
+                          <button onClick={() => openPeek(eventScreening, null)} className="text-[10.5px] font-semibold text-ink-3">
+                            +{eventTypes.length - 2}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            </Link>
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      )}
       {peek && <EventPeek target={peek} onClose={() => setPeek(null)} />}
     </div>
   );

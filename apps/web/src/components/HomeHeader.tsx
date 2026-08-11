@@ -372,16 +372,18 @@ export default function HomeHeader({
         >
           🎁 특전 피드
         </Link>
-        <button
-          onClick={() => onAfterNowChange(!afterNow)}
-          className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-            afterNow && isToday
-              ? "border-app bg-app-tint text-app"
-              : "border-line bg-panel text-ink-3"
-          }`}
-        >
-          🕒 지금 이후
-        </button>
+        {view !== "time" && (
+          <button
+            onClick={() => onAfterNowChange(!afterNow)}
+            className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+              afterNow && isToday
+                ? "border-app bg-app-tint text-app"
+                : "border-line bg-panel text-ink-3"
+            }`}
+          >
+            🕒 지금 이후
+          </button>
+        )}
       </div>
 
       {/* 체인 필터 + 영화 골라보기 */}
