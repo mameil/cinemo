@@ -175,9 +175,10 @@ export default function TimelineView({
           <button
             key={key}
             onClick={() => selectRange(key)}
+            aria-pressed={range === key}
             className={`flex-none rounded-full border px-3 py-1.5 text-[11.5px] font-bold ${range === key ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
           >
-            {label}
+            {range === key && <span aria-hidden="true">✓ </span>}{label}
           </button>
         ))}
         {favoriteTheaters.size > 0 && (
@@ -187,7 +188,7 @@ export default function TimelineView({
             aria-pressed={favoritesFirst}
             className={`flex-none rounded-full border px-3 py-1.5 text-[11.5px] font-bold ${favoritesFirst ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
           >
-            ★ 즐겨찾기 우선
+            {favoritesFirst ? "✓ " : "★ "}즐겨찾기 우선
           </button>
         )}
       </div>
@@ -198,9 +199,10 @@ export default function TimelineView({
           <button
             type="button"
             onClick={() => selectPriorityRegion(null)}
+            aria-pressed={priorityRegion === null}
             className={`flex-none rounded-full border px-2.5 py-1 text-[10.5px] font-bold ${priorityRegion === null ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
           >
-            해제
+            {priorityRegion === null && <span aria-hidden="true">✓ </span>}해제
           </button>
           {regions.map((region) => (
             <button
@@ -210,7 +212,7 @@ export default function TimelineView({
               aria-pressed={priorityRegion === region}
               className={`flex-none rounded-full border px-2.5 py-1 text-[10.5px] font-bold ${priorityRegion === region ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
             >
-              {region}
+              {priorityRegion === region && <span aria-hidden="true">✓ </span>}{region}
             </button>
           ))}
         </div>

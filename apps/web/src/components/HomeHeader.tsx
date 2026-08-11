@@ -358,6 +358,7 @@ export default function HomeHeader({
             <button
               key={d.dateStr}
               onClick={() => onDateChange(d.dateStr)}
+              aria-current={active ? "date" : undefined}
               className={`flex-none rounded-xl border px-2.5 py-1.5 text-center ${
                 active
                   ? "border-ink bg-ink text-white"
@@ -367,7 +368,7 @@ export default function HomeHeader({
               <small className={`block text-[10px] ${active ? "text-white/70" : "text-ink-3"}`}>
                 {d.label}
               </small>
-              <b className="block text-[15px] leading-tight">{d.day}</b>
+              <b className="block text-[15px] leading-tight">{active && <span className="mr-0.5" aria-hidden="true">✓</span>}{d.day}</b>
               <span className={`mt-0.5 block text-[9px] tabular-nums ${active ? "text-white/75" : "text-ink-3"}`}>
                 {dateStatus ? `${dateStatus.theaterCount}개 극장` : "일정 없음"}
               </span>
@@ -387,23 +388,25 @@ export default function HomeHeader({
         <div className="inline-flex rounded-[10px] bg-[#e7ebf1] p-0.5">
           <button
             onClick={() => onViewChange("movie")}
+            aria-pressed={view === "movie"}
             className={`rounded-lg px-3 py-1 text-[12.5px] font-bold ${
               view === "movie"
                 ? "bg-white text-ink shadow-sm"
                 : "text-ink-2"
             }`}
           >
-            영화별
+            {view === "movie" && <span aria-hidden="true">✓ </span>}영화별
           </button>
           <button
             onClick={() => onViewChange("time")}
+            aria-pressed={view === "time"}
             className={`rounded-lg px-3 py-1 text-[12.5px] font-bold ${
               view === "time"
                 ? "bg-white text-ink shadow-sm"
                 : "text-ink-2"
             }`}
           >
-            시간순
+            {view === "time" && <span aria-hidden="true">✓ </span>}시간순
           </button>
         </div>
         <Link
@@ -421,13 +424,14 @@ export default function HomeHeader({
         {view !== "time" && (
           <button
             onClick={() => onAfterNowChange(!afterNow)}
+            aria-pressed={afterNow && isToday}
             className={`ml-auto hidden items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors sm:inline-flex ${
               afterNow && isToday
                 ? "border-app bg-app-tint text-app"
                 : "border-line bg-panel text-ink-3"
             }`}
           >
-            🕒 지금 이후
+            {afterNow && isToday ? "✓ " : "🕒 "}지금 이후
           </button>
         )}
       </div>
@@ -437,9 +441,10 @@ export default function HomeHeader({
         {CHAINS.map((c) => {
           const active = !excludedChains.has(c.key);
           return (
-            <button
-              key={c.key}
-              onClick={() => onToggleChain(c.key)}
+          <button
+            key={c.key}
+            onClick={() => onToggleChain(c.key)}
+            aria-pressed={active}
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12.5px] font-semibold transition-colors ${
                 active
                   ? "border-app bg-app-tint text-app"
@@ -450,19 +455,20 @@ export default function HomeHeader({
                 className="h-[7px] w-[7px] rounded-full"
                 style={{ background: active ? c.color : "#ccc" }}
               />
-              {c.label}
+              {active && <span aria-hidden="true">✓</span>}{c.label}
             </button>
           );
         })}
         <button
           onClick={() => onGoodieOnlyChange(!goodieOnly)}
+          aria-pressed={goodieOnly}
           className={`rounded-full border px-2.5 py-1 text-[12.5px] font-semibold transition-colors ${
             goodieOnly
               ? "border-goodie bg-goodie-tint text-goodie"
               : "border-line bg-panel text-ink-2"
           }`}
         >
-          🎁 특전만
+          {goodieOnly ? "✓ " : "🎁 "}특전만
         </button>
         <button
           onClick={() => { setShowMovies((v) => !v); setShowTheaters(false); }}
@@ -539,9 +545,10 @@ export default function HomeHeader({
                     <button
                       key={chain.key}
                       onClick={() => onToggleChain(chain.key)}
+                      aria-pressed={active}
                       className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-app bg-app-tint text-app" : "border-line bg-ground text-ink-3 opacity-55"}`}
                     >
-                      {chain.label}
+                      {active && <span aria-hidden="true">✓ </span>}{chain.label}
                     </button>
                   );
                 })}
@@ -551,29 +558,33 @@ export default function HomeHeader({
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 onClick={() => onGoodieOnlyChange(!goodieOnly)}
+                aria-pressed={goodieOnly}
                 className={`rounded-full border px-3 py-1.5 text-xs font-bold ${goodieOnly ? "border-goodie bg-goodie-tint text-goodie" : "border-line bg-panel text-ink-2"}`}
               >
-                🎁 특전만
+                {goodieOnly ? "✓ " : "🎁 "}특전만
               </button>
               {view !== "time" && isToday && (
                 <button
                   onClick={() => onAfterNowChange(!afterNow)}
+                  aria-pressed={afterNow}
                   className={`rounded-full border px-3 py-1.5 text-xs font-bold ${afterNow ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-2"}`}
                 >
-                  🕒 지금 이후
+                  {afterNow ? "✓ " : "🕒 "}지금 이후
                 </button>
               )}
               <button
                 onClick={() => { setShowTheaters((value) => !value); setShowMovies(false); }}
+                aria-expanded={showTheaters}
                 className={`rounded-full border px-3 py-1.5 text-xs font-bold ${showTheaters || hasTheaterFilter ? "border-app bg-app-tint text-app" : "border-line"}`}
               >
-                🏠 극장 선택
+                {showTheaters ? "✓ " : "🏠 "}극장 선택
               </button>
               <button
                 onClick={() => { setShowMovies((value) => !value); setShowTheaters(false); }}
+                aria-expanded={showMovies}
                 className={`rounded-full border px-3 py-1.5 text-xs font-bold ${showMovies || hasMovieFilter ? "border-app bg-app-tint text-app" : "border-line"}`}
               >
-                🎬 영화 선택
+                {showMovies ? "✓ " : "🎬 "}영화 선택
               </button>
             </div>
 
@@ -592,9 +603,10 @@ export default function HomeHeader({
                           <button
                             key={theater.id}
                             onClick={() => onToggleTheater(theater.id)}
+                            aria-pressed={active}
                             className={`rounded-lg border px-2 py-1 text-[11px] ${active ? "border-line bg-white text-ink-2" : "border-line-soft text-ink-3 line-through opacity-50"}`}
                           >
-                            {theater.branchName}{theater.openToday === false && ` · ${emptyLabel}`}
+                            {active && <span aria-hidden="true">✓ </span>}{theater.branchName}{theater.openToday === false && ` · ${emptyLabel}`}
                           </button>
                         );
                       })}
@@ -615,11 +627,11 @@ export default function HomeHeader({
                   {movies.map((movie) => {
                     const active = !excludedMovies.has(movie.id);
                     return (
-                      <button key={movie.id} onClick={() => onToggleMovie(movie.id)} className="w-[58px] flex-none">
+                      <button key={movie.id} onClick={() => onToggleMovie(movie.id)} aria-pressed={active} className="w-[58px] flex-none">
                         {movie.posterUrl ? (
                           <img src={movie.posterUrl.replace("/w500/", "/w200/")} alt={`${movie.title} 포스터`} className={`h-[78px] w-[54px] rounded-lg object-cover ${active ? "ring-2 ring-app" : "opacity-45"}`} />
                         ) : <div className={`flex h-[78px] w-[54px] items-center justify-center rounded-lg bg-line-soft ${active ? "ring-2 ring-app" : "opacity-45"}`}>🎞️</div>}
-                        <span className="mt-1 block truncate text-[9.5px]">{movie.title}</span>
+                        <span className="mt-1 block truncate text-[9.5px]">{active && <span aria-hidden="true">✓ </span>}{movie.title}</span>
                       </button>
                     );
                   })}

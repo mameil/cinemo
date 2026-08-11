@@ -131,10 +131,11 @@ export default function DiscoverHome() {
               <button
                 key={item.date}
                 onClick={() => changeDate(item.date)}
+                aria-current={active ? "date" : undefined}
                 className={`flex-none rounded-xl border px-3 py-1.5 text-center ${active ? "border-ink bg-ink text-white" : "border-line bg-panel text-ink"}`}
               >
                 <small className={`block text-[10px] ${active ? "text-white/70" : "text-ink-3"}`}>{item.label}</small>
-                <b className="block text-[15px] leading-tight">{item.day}</b>
+                <b className="block text-[15px] leading-tight">{active && <span className="mr-0.5" aria-hidden="true">✓</span>}{item.day}</b>
                 <span className={`mt-0.5 block text-[9px] ${active ? "text-white/75" : "text-ink-3"}`}>
                   {status ? `${status.theaterCount}개 극장` : "일정 없음"}
                 </span>
