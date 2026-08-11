@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ScreeningCard, EventPreview } from "@mock/types";
 import { CHAIN_COLOR, GOODIE_BADGE_CLASS, seatStatus, formatLabel, timeSlot } from "@/lib/utils";
 import EventPeek, { type PeekTarget } from "@/components/EventPeek";
+import { parseProgramTitle } from "@/lib/program-title";
 
 type TimeRange = "now" | "evening" | "late" | "all";
 const FAVORITE_THEATERS_KEY = "cinemo-favorite-theaters";
@@ -220,6 +221,7 @@ export default function TimelineView({
       ) : (
         <div className="flex flex-col gap-2.5">
           {groups.map((group) => {
+            const program = parseProgramTitle(group.movie.title);
             const slot = timeSlot(group.firstTime);
             const showSlot = slot !== lastSlot;
             lastSlot = slot;
@@ -251,10 +253,17 @@ export default function TimelineView({
                   <div className="min-w-0 px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <Link href={`/movies/${group.movie.id}`} className="min-w-0 flex-1">
-                        <h3 className="truncate text-[14.5px] font-semibold tracking-tight">{group.movie.title}</h3>
+                        <h3 className="truncate text-[14.5px] font-semibold tracking-tight">{program.title}</h3>
                       </Link>
                       <span className="flex-none text-[10.5px] text-ink-3">{group.items.length}회</span>
                     </div>
+                    {program.badges.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {program.badges.map((badge) => (
+                          <span key={badge} className="rounded-full border border-app/25 bg-app-tint px-1.5 py-px text-[9px] font-bold text-app">{badge}</span>
+                        ))}
+                      </div>
+                    )}
                     <p className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-2">
                       <span className="h-[7px] w-[7px] rounded-full" style={{ background: CHAIN_COLOR[group.theater.chain] }} />
                       {group.theater.branchName}

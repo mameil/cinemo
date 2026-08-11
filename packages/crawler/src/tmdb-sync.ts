@@ -14,7 +14,7 @@ function sleep(ms: number): Promise<void> {
  * 원래 제목의 일부를 잘라 엉뚱한 동명작 포스터가 붙는 것을 막는다.
  */
 export function posterSearchAliases(title: string): string[] {
-  if (/^\d+강\.|\+\s*강의\b/u.test(title)) return [];
+  if (/^\d+강\.|\+\s*강의(?:\s|$)/u.test(title)) return [];
 
   const aliases = new Set<string>();
   const add = (value: string) => {
@@ -26,7 +26,7 @@ export function posterSearchAliases(title: string): string[] {
   add(title.replace(/^보여줘,\s*시네클럽!\s*/u, ""));
   add(title.replace(/^애니살롱전\s*\d+월\s*:\s*/u, ""));
   add(title.replace(/^금요일밤의\s*동시상영\s*:\s*/u, ""));
-  add(title.replace(/\s*\+\s*(?:시네토크|GV|관객과의\s*대화)\b.*$/iu, ""));
+  add(title.replace(/\s*\+\s*(?:시네토크|GV|관객과의\s*대화)(?:\s+.*)?$/iu, ""));
 
   // 합본은 편성 전체가 단일 작품이 아니므로 첫 본편 포스터만 대표 이미지로 사용한다.
   for (const alias of [title, ...aliases]) {

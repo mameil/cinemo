@@ -6,6 +6,7 @@ import { CHAIN_COLOR, GOODIE_BADGE_CLASS, GOODIE_CHIP_CLASS, cleanGoodieName, se
 import { requiredFormat, formatSatisfies } from "@/lib/event-rules";
 import EventPeek, { type PeekTarget } from "@/components/EventPeek";
 import Link from "next/link";
+import { parseProgramTitle } from "@/lib/program-title";
 
 interface MovieGroup {
   movie: MovieMini;
@@ -144,6 +145,7 @@ function MovieGroupCard({
   const visibleTheaters = g.byTheater.slice(0, collapsedMax);
   const hiddenCount = g.byTheater.length - collapsedMax;
   const next = nextTime(g, cutoff);
+  const program = parseProgramTitle(g.movie.title);
 
   // 이 영화가 상영 중인 체인들의 미리보기 (요약 클릭용)
   const chainEntries = [...new Set(g.byTheater.map((t) => t.chain))]
@@ -171,12 +173,20 @@ function MovieGroupCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Link href={`/movies/${g.movie.id}`} className="min-w-0 flex-1">
-              <h3 className="truncate text-[16px] font-bold tracking-tight">{g.movie.title}</h3>
+              <h3 className="truncate text-[16px] font-bold tracking-tight">{program.title}</h3>
             </Link>
             <span className="flex-none text-[11px] font-bold text-ink-3 tabular-nums">
               {g.byTheater.length}곳 · {g.screenings.length}회
             </span>
           </div>
+
+          {program.badges.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {program.badges.map((badge) => (
+                <span key={badge} className="rounded-full border border-app/25 bg-app-tint px-1.5 py-px text-[9.5px] font-bold text-app">{badge}</span>
+              ))}
+            </div>
+          )}
 
           <p className="mt-1 text-[12px]">
             {next ? (

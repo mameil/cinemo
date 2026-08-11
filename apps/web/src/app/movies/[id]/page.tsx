@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { parseProgramTitle } from "@/lib/program-title";
 import { CHAIN_COLOR, GOODIE_BADGE_CLASS, GOODIE_CHIP_CLASS, cleanGoodieName, shortScreenName } from "@/lib/utils";
 import { requiredFormat, formatSatisfies } from "@/lib/event-rules";
 
@@ -484,12 +485,14 @@ export default function MovieDetailPage() {
     );
   }
 
+  const program = parseProgramTitle(detail.title);
+
   return (
     <main className="mx-auto max-w-[980px]">
       {/* 상단 네비 */}
       <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-white/95 px-3.5 py-2.5 backdrop-blur-sm">
         <Link href="/movies" className="text-lg">←</Link>
-        <b className="text-[15px]">{detail.title}</b>
+        <b className="truncate text-[15px]">{program.title}</b>
       </div>
 
       {/* 히어로 */}
@@ -506,7 +509,14 @@ export default function MovieDetailPage() {
           </div>
         )}
         <div>
-          <h2 className="mt-1 mb-2 text-[21px] font-bold tracking-tight">{detail.title}</h2>
+          <h2 className="mt-1 mb-2 text-[21px] font-bold tracking-tight">{program.title}</h2>
+          {program.badges.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1">
+              {program.badges.map((badge) => (
+                <span key={badge} className="rounded-full border border-app/25 bg-app-tint px-2 py-0.5 text-[10px] font-bold text-app">{badge}</span>
+              ))}
+            </div>
+          )}
           {detail.releaseDate && (
             <p className="text-[13px] text-ink-2">개봉 {detail.releaseDate.replace(/-/g, ".")}</p>
           )}
