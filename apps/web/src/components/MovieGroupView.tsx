@@ -14,7 +14,16 @@ interface MovieGroup {
   byTheater: { key: string; chain: string; name: string; items: ScreeningCard[] }[];
 }
 
-function groupByMovie(screenings: ScreeningCard[]): MovieGroup[] {
+type MovieSort = "next" | "popular" | "title" | "goodie";
+
+function nextTime(group: MovieGroup, cutoff: string): string | null {
+  return group.screenings
+    .map((screening) => screening.startTime)
+    .filter((time) => time >= cutoff)
+    .sort()[0] ?? null;
+}
+
+function groupByMovie(screenings: ScreeningCard[], sort: MovieSort, cutoff: string): MovieGroup[] {
   const map = new Map<number, MovieGroup>();
   for (const s of screenings) {
     let g = map.get(s.movie.id);
@@ -34,7 +43,17 @@ function groupByMovie(screenings: ScreeningCard[]): MovieGroup[] {
     }
     th.items.push(s);
   }
-  return [...map.values()].sort((a, b) => b.screenings.length - a.screenings.length);
+  return [...map.values()].sort((a, b) => {
+    const aNext = nextTime(a, cutoff);
+    const bNext = nextTime(b, cutoff);
+    const byNext = (aNext ?? "99:99").localeCompare(bNext ?? "99:99");
+    if (sort === "popular") return b.screenings.length - a.screenings.length || byNext;
+    if (sort === "title") return a.movie.title.localeCompare(b.movie.title, "ko");
+    if (sort === "goodie") {
+      return Number(b.eventTypes.length > 0) - Number(a.eventTypes.length > 0) || byNext;
+    }
+    return byNext || b.screenings.length - a.screenings.length;
+  });
 }
 
 /**
@@ -111,18 +130,18 @@ function MovieGroupCard({
   eventPreviews,
   goodieStock,
   onPeek,
-  onExcludeMovie,
+  cutoff,
 }: {
   g: MovieGroup;
   eventPreviews: Record<string, EventPreview[]>;
   goodieStock: Record<string, GoodieStockLite[]>;
   onPeek: (t: PeekTarget) => void;
-  onExcludeMovie?: (id: number) => void;
+  cutoff: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const collapsedMax = 3; // 접힌 상태에서 보여줄 극장 수
-  const visibleTheaters = expanded ? g.byTheater : g.byTheater.slice(0, collapsedMax);
+  const collapsedMax = 2;
+  const visibleTheaters = g.byTheater.slice(0, collapsedMax);
   const hiddenCount = g.byTheater.length - collapsedMax;
+  const next = nextTime(g, cutoff);
 
   // 이 영화가 상영 중인 체인들의 미리보기 (요약 클릭용)
   const chainEntries = [...new Set(g.byTheater.map((t) => t.chain))]
@@ -137,7 +156,7 @@ function MovieGroupCard({
           {g.movie.posterUrl ? (
             <img
               src={g.movie.posterUrl.replace("/w500/", "/w200/")}
-              alt=""
+              alt={`${g.movie.title} 포스터`}
               className="h-[80px] w-[55px] rounded-[9px] object-cover bg-[#dfe4ea]"
             />
           ) : (
@@ -155,17 +174,15 @@ function MovieGroupCard({
             <span className="flex-none text-[11px] font-bold text-ink-3 tabular-nums">
               {g.byTheater.length}곳 · {g.screenings.length}회
             </span>
-            {onExcludeMovie && (
-              <button
-                onClick={() => onExcludeMovie(g.movie.id)}
-                title="이 영화 숨기기 — 상단 영화 필터에서 복원"
-                aria-label={`${g.movie.title} 숨기기`}
-                className="flex-none rounded-full border border-line bg-app-tint px-1.5 text-[13px] leading-[20px] text-ink-3 hover:border-app hover:text-app transition-colors"
-              >
-                ✕
-              </button>
-            )}
           </div>
+
+          <p className="mt-1 text-[12px]">
+            {next ? (
+              <><span className="font-extrabold text-app">다음 {next}</span><span className="ml-1.5 text-ink-3">가장 빠른 상영</span></>
+            ) : (
+              <span className="font-semibold text-ink-3">오늘 상영 종료</span>
+            )}
+          </p>
 
           {/* 특전 요약 (있을 때만) — 클릭 → 전체 미리보기 */}
           {g.eventTypes.length > 0 && (
@@ -316,12 +333,12 @@ function MovieGroupCard({
 
       {/* 더보기 / 접기 */}
       {g.byTheater.length > collapsedMax && (
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="w-full border-t border-line-soft py-2 text-center text-[11.5px] font-semibold text-ink-3 hover:text-app transition-colors"
+        <Link
+          href={`/movies/${g.movie.id}`}
+          className="block w-full border-t border-line-soft py-2 text-center text-[11.5px] font-semibold text-ink-3 hover:text-app transition-colors"
         >
-          {expanded ? "접기 ▲" : `${hiddenCount}곳 더보기 ▼`}
-        </button>
+          나머지 {hiddenCount}곳 시간표 보기 →
+        </Link>
       )}
     </div>
   );
@@ -331,21 +348,41 @@ export default function MovieGroupView({
   screenings,
   eventPreviews = {},
   goodieStock = {},
-  onExcludeMovie,
+  isToday = false,
 }: {
   screenings: ScreeningCard[];
   eventPreviews?: Record<string, EventPreview[]>;
   goodieStock?: Record<string, GoodieStockLite[]>;
-  /** 카드의 ✕ — 해당 영화를 즉석 제외 (excludedMovies 필터로 연결, 헤더 영화 필터에서 복원) */
-  onExcludeMovie?: (id: number) => void;
+  isToday?: boolean;
 }) {
-  const groups = groupByMovie(screenings);
+  const [sort, setSort] = useState<MovieSort>("next");
   const [peek, setPeek] = useState<PeekTarget | null>(null);
+  const now = new Date();
+  const cutoff = isToday
+    ? `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+    : "00:00";
+  const groups = groupByMovie(screenings, sort, cutoff);
 
   return (
     <div className="flex flex-col gap-2.5 p-3">
+      <div className="flex items-center gap-2 pb-0.5">
+        <b className="text-[12px] text-ink-2">영화 {groups.length}편</b>
+        <label className="ml-auto flex items-center gap-1.5 text-[11px] text-ink-3">
+          정렬
+          <select
+            value={sort}
+            onChange={(event) => setSort(event.target.value as MovieSort)}
+            className="rounded-lg border border-line bg-panel px-2 py-1 text-[11.5px] font-semibold text-ink outline-none focus:border-app"
+          >
+            <option value="next">빠른 상영순</option>
+            <option value="popular">상영 많은 순</option>
+            <option value="title">가나다순</option>
+            <option value="goodie">특전 우선</option>
+          </select>
+        </label>
+      </div>
       {groups.map((g) => (
-        <MovieGroupCard key={g.movie.id} g={g} eventPreviews={eventPreviews} goodieStock={goodieStock} onPeek={setPeek} onExcludeMovie={onExcludeMovie} />
+        <MovieGroupCard key={g.movie.id} g={g} eventPreviews={eventPreviews} goodieStock={goodieStock} onPeek={setPeek} cutoff={cutoff} />
       ))}
       {peek && <EventPeek target={peek} onClose={() => setPeek(null)} />}
     </div>

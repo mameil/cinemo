@@ -455,7 +455,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
           screenings={filtered}
           eventPreviews={data?.eventPreviews}
           goodieStock={data?.goodieStock}
-          onExcludeMovie={handleToggleMovie}
+          isToday={isToday}
         />
       ) : (
         <TimelineView screenings={filtered} eventPreviews={data?.eventPreviews} />
