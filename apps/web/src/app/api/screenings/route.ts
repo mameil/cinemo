@@ -326,12 +326,14 @@ async function handleGet(req: NextRequest) {
     .select({
       theaterId: screenings.theaterId,
       updatedAt: sql<string | null>`MAX(${screenings.updatedAt})`,
+      publishedThrough: sql<string | null>`MAX(CASE WHEN ${screenings.playDate} >= ${today} THEN ${screenings.playDate} END)`,
     })
     .from(screenings)
     .innerJoin(theaters, eq(screenings.theaterId, theaters.id))
     .where(branchFilter)
     .groupBy(screenings.theaterId);
   const theaterUpdatedAt = new Map(theaterUpdateRows.map((row) => [row.theaterId, row.updatedAt]));
+  const theaterPublishedThrough = new Map(theaterUpdateRows.map((row) => [row.theaterId, row.publishedThrough]));
 
   // 지역 그룹핑
   const AREA_RULES: { label: string; keywords: string[] }[] = [
@@ -348,12 +350,22 @@ async function handleGet(req: NextRequest) {
   }
 
   const theaterList = [...theaterInfoMap.values()]
-    .map((t) => ({
-      ...t,
-      area: t.chain === "INDIE" ? "독립영화관" : getArea(t.branchName),
-      openToday: openTheaterIds.has(t.id), // 그 날 상영 있음 여부 (없으면 필터에 '쉼' 표시)
-      updatedAt: theaterUpdatedAt.get(t.id) ?? null,
-    }))
+    .map((t) => {
+      const open = openTheaterIds.has(t.id);
+      const publishedThrough = theaterPublishedThrough.get(t.id);
+      const scheduleStatus = open
+        ? "open"
+        : publishedThrough && date <= publishedThrough
+          ? "closed"
+          : "uncollected";
+      return {
+        ...t,
+        area: t.chain === "INDIE" ? "독립영화관" : getArea(t.branchName),
+        openToday: open,
+        scheduleStatus,
+        updatedAt: theaterUpdatedAt.get(t.id) ?? null,
+      };
+    })
     .sort((a, b) => a.area.localeCompare(b.area) || a.branchName.localeCompare(b.branchName));
 
   // 서비스 대상 극장의 날짜별 등록 범위. 날짜 칩에서 "몇 개 극장 일정이

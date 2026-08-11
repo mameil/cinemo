@@ -76,6 +76,7 @@ function TheaterRow({
   onToggleFavorite: (theaterId: number) => void;
 }) {
   const hasSchedule = theater.items.length > 0;
+  const emptyLabel = theater.scheduleStatus === "closed" ? "쉼" : "일정 미등록";
   const color = theater.chain === "CGV"
     ? "var(--color-cgv)"
     : theater.chain === "LOTTE"
@@ -95,7 +96,7 @@ function TheaterRow({
         <div className="min-w-0 flex-1">
           <b className="block truncate text-[13px]">{theater.branchName}</b>
           <small className="text-[10px] text-ink-3">
-            {!hasSchedule ? "일정 없음" : theater.next ? `다음 상영 ${theater.next}` : "오늘 상영 종료"}
+            {!hasSchedule ? emptyLabel : theater.next ? `다음 상영 ${theater.next}` : "오늘 상영 종료"}
           </small>
           <small className="ml-1 text-[9px] text-ink-3">· {updateLabel(theater.updatedAt)}</small>
         </div>

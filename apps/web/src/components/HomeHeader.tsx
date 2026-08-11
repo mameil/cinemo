@@ -40,8 +40,10 @@ export interface TheaterInfo {
   chain: string;
   branchName: string;
   area: string;
-  /** 선택 날짜에 상영이 있는지 — false면 그 날 쉬는 극장 (필터에 '쉼' 표시) */
+  /** 선택 날짜에 상영이 있는지 */
   openToday?: boolean;
+  /** open=상영 있음, closed=공개된 일정 범위 안의 빈 날, uncollected=아직 일정 범위 밖 */
+  scheduleStatus?: "open" | "closed" | "uncollected";
   /** 이 극장의 시간표를 마지막으로 수집·갱신한 시각 */
   updatedAt?: string | null;
 }
@@ -240,7 +242,8 @@ export default function HomeHeader({
                 <div className="flex flex-wrap gap-1.5 pl-1">
                   {list.map((t) => {
                     const active = !excludedTheaters.has(t.id);
-                    const closed = t.openToday === false; // 그 날 쉬는 극장
+                    const closed = t.openToday === false;
+                    const emptyLabel = t.scheduleStatus === "closed" ? "쉼" : "일정 미등록";
                     return (
                       <button
                         key={t.id}
@@ -258,7 +261,7 @@ export default function HomeHeader({
                           style={{ background: active && !closed ? (CHAIN_COLORS[t.chain] ?? "#999") : "#ccc" }}
                         />
                         {t.branchName}
-                        {closed && <span className="ml-0.5 text-[9.5px] text-ink-3">· 쉼</span>}
+                        {closed && <span className="ml-0.5 text-[9.5px] text-ink-3">· {emptyLabel}</span>}
                       </button>
                     );
                   })}
@@ -578,13 +581,14 @@ export default function HomeHeader({
                     <div className="flex flex-wrap gap-1.5">
                       {list.map((theater) => {
                         const active = !excludedTheaters.has(theater.id);
+                        const emptyLabel = theater.scheduleStatus === "closed" ? "쉼" : "일정 미등록";
                         return (
                           <button
                             key={theater.id}
                             onClick={() => onToggleTheater(theater.id)}
                             className={`rounded-lg border px-2 py-1 text-[11px] ${active ? "border-line bg-white text-ink-2" : "border-line-soft text-ink-3 line-through opacity-50"}`}
                           >
-                            {theater.branchName}{theater.openToday === false && " · 쉼"}
+                            {theater.branchName}{theater.openToday === false && ` · ${emptyLabel}`}
                           </button>
                         );
                       })}
