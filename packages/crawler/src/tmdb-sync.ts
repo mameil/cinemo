@@ -9,6 +9,35 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * 극장이 본편 제목에 기획전명·토크 정보를 붙인 편성명에서 안전한 검색 별칭을 만든다.
+ * 임의의 콜론/대괄호를 전부 지우지 않는다. 실제 수집된 기획전 표기만 허용해
+ * 원래 제목의 일부를 잘라 엉뚱한 동명작 포스터가 붙는 것을 막는다.
+ */
+export function posterSearchAliases(title: string): string[] {
+  if (/^\d+강\.|\+\s*강의\b/u.test(title)) return [];
+
+  const aliases = new Set<string>();
+  const add = (value: string) => {
+    const normalized = value.trim().replace(/\s+/g, " ");
+    if (normalized.length >= 2 && normalized !== title) aliases.add(normalized);
+  };
+
+  add(title.replace(/^\[(?:시네마투어|정시상영단)\]\s*/u, ""));
+  add(title.replace(/^보여줘,\s*시네클럽!\s*/u, ""));
+  add(title.replace(/^애니살롱전\s*\d+월\s*:\s*/u, ""));
+  add(title.replace(/^금요일밤의\s*동시상영\s*:\s*/u, ""));
+  add(title.replace(/\s*\+\s*(?:시네토크|GV|관객과의\s*대화)\b.*$/iu, ""));
+
+  // 합본은 편성 전체가 단일 작품이 아니므로 첫 본편 포스터만 대표 이미지로 사용한다.
+  for (const alias of [title, ...aliases]) {
+    if (!alias.includes("+")) continue;
+    add(alias.split("+")[0]);
+  }
+
+  return [...aliases];
+}
+
+/**
  * KOBIS 감독 ↔ TMDB 감독 대조 — 연도까지 같은 동명작 구분의 최종 관문.
  * (2026-08-02 지난 여름 사건: 최승우 2023작이 같은 제목·같은 해 프랑스 단편에 붙음 — 연도 필터 무력)
  * 이름 토큰 교집합 판정: 4자 이상 토큰 1개 또는 토큰 2개 이상 일치 → 동일 인물
@@ -110,16 +139,23 @@ export async function syncMovies(): Promise<void> {
     // 제작연도를 알면 연도 필터로 정확 검색 → 없거나 실패 시 연도 없이 검색(불변식으로 검증)
     let result = prodYear ? await resolveMoviePoster(movie.title, prodYear) : null;
     if (!result) result = await resolveMoviePoster(movie.title);
-    // 기획전 편성명에는 원 영화명 뒤에 부/회차·토크 정보가 붙는다.
-    // TMDB에는 원 제목만 있으므로 안전하게 제거한 별칭으로 한 번 더 찾는다.
+    // 기획전 편성명에는 본편 앞뒤로 프로그램명·토크 정보가 붙는다.
+    // 실제 수집 형식만 보수적으로 정리한 별칭으로 다시 찾는다.
     if (!result) {
-      const baseTitle = movie.title
+      const numberedTitle = movie.title
         .replace(/\s+\d+\s*[~～-]\s*\d+\s*부(?:\s*\+.*)?$/u, "")
         .replace(/\s+\d+\s*부(?:\s*\+.*)?$/u, "")
         .trim();
-      if (baseTitle && baseTitle !== movie.title) {
-        result = await resolveMoviePoster(baseTitle);
-        if (result) console.log(`  ↻ [${movie.id}] 편성명 → 원 제목 "${baseTitle}"로 매칭`);
+      const aliases = new Set([
+        ...(numberedTitle !== movie.title ? [numberedTitle] : []),
+        ...posterSearchAliases(movie.title),
+      ]);
+      for (const alias of aliases) {
+        result = await resolveMoviePoster(alias);
+        if (result) {
+          console.log(`  ↻ [${movie.id}] 편성명 → 원 제목 "${alias}"로 매칭`);
+          break;
+        }
       }
     }
     if (result && !plausible(result)) {
@@ -208,29 +244,34 @@ async function backfillPosterFallback(): Promise<void> {
   }
   console.log(`=== 포스터 폴백(극장 공지 이미지): ${targets.length}건 적용 (대상 ${rows.length}건) ===`);
 
-  // 3차 폴백: 합본 상영명("A + B")은 첫 작품의 TMDB 포스터만 빌려온다.
-  // tmdbId는 기록하지 않는다 — 합본 편성 ≠ 단일 작품 (2026-08-02, 어느 뻣뻣한 하루 + 더 치킨).
-  const composites = (await db.all(sql`
-    SELECT id, title FROM movies WHERE poster_url IS NULL AND title LIKE '%+%'
+  // 3차 폴백: 본편을 식별할 수 있는 특별 편성은 원 작품의 포스터만 빌려온다.
+  // tmdbId는 기록하지 않는다 — 기획전·합본 편성 자체는 단일 TMDB 작품이 아니다.
+  const specialPrograms = (await db.all(sql`
+    SELECT id, title FROM movies WHERE poster_url IS NULL
   `)) as { id: number; title: string }[];
-  let compositeFilled = 0;
-  for (const c of composites) {
-    const first = c.title.split("+")[0].trim();
-    if (first.length < 2) continue;
-    try {
-      const r = await resolveMoviePoster(first);
-      if (r?.posterUrl) {
-        await db.run(sql`UPDATE movies SET poster_url = ${r.posterUrl} WHERE id = ${c.id} AND poster_url IS NULL`);
-        console.log(`  ↻ 합본 "${c.title}" → 첫 작품 "${first}" 포스터 차용`);
-        compositeFilled++;
+  let specialFilled = 0;
+  let specialTargets = 0;
+  for (const program of specialPrograms) {
+    const aliases = posterSearchAliases(program.title);
+    if (aliases.length === 0) continue;
+    specialTargets++;
+    for (const alias of aliases) {
+      try {
+        const result = await resolveMoviePoster(alias);
+        if (result?.posterUrl) {
+          await db.run(sql`UPDATE movies SET poster_url = ${result.posterUrl} WHERE id = ${program.id} AND poster_url IS NULL`);
+          console.log(`  ↻ 특별 편성 "${program.title}" → 본편 "${alias}" 포스터 차용`);
+          specialFilled++;
+          break;
+        }
+      } catch {
+        // 조회 실패는 다음 실행에서 재시도
       }
-    } catch {
-      // 조회 실패는 다음 실행에서 재시도
+      await sleep(250);
     }
-    await sleep(250);
   }
-  if (composites.length) {
-    console.log(`=== 합본 포스터 차용: ${compositeFilled}/${composites.length}건 ===`);
+  if (specialTargets) {
+    console.log(`=== 특별 편성 포스터 차용: ${specialFilled}/${specialTargets}건 ===`);
   }
 }
 
