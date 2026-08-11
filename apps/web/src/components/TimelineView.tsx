@@ -7,6 +7,7 @@ import { CHAIN_COLOR, GOODIE_BADGE_CLASS, seatStatus, formatLabel, timeSlot } fr
 import EventPeek, { type PeekTarget } from "@/components/EventPeek";
 
 type TimeRange = "now" | "evening" | "late" | "all";
+const FAVORITE_THEATERS_KEY = "cinemo-favorite-theaters";
 
 interface TimelineGroup {
   key: string;
@@ -28,7 +29,7 @@ function inRange(time: string, range: TimeRange, isToday: boolean) {
   return true;
 }
 
-function groupScreenings(screenings: ScreeningCard[]): TimelineGroup[] {
+function groupScreenings(screenings: ScreeningCard[], favoriteTheaters: Set<number>, favoritesFirst: boolean): TimelineGroup[] {
   const map = new Map<string, TimelineGroup>();
   for (const screening of screenings) {
     const key = `${screening.movie.id}-${screening.theater.id}`;
@@ -45,7 +46,13 @@ function groupScreenings(screenings: ScreeningCard[]): TimelineGroup[] {
   }
   return [...map.values()]
     .map((group) => ({ ...group, items: group.items.sort((a, b) => a.startTime.localeCompare(b.startTime)) }))
-    .sort((a, b) => a.firstTime.localeCompare(b.firstTime));
+    .sort((a, b) => {
+      if (favoritesFirst) {
+        const favoriteOrder = Number(favoriteTheaters.has(b.theater.id)) - Number(favoriteTheaters.has(a.theater.id));
+        if (favoriteOrder !== 0) return favoriteOrder;
+      }
+      return a.firstTime.localeCompare(b.firstTime);
+    });
 }
 
 export default function TimelineView({
@@ -61,6 +68,19 @@ export default function TimelineView({
 }) {
   const [range, setRange] = useState<TimeRange>(isToday ? "now" : "all");
   const [peek, setPeek] = useState<PeekTarget | null>(null);
+  const [favoriteTheaters, setFavoriteTheaters] = useState<Set<number>>(new Set());
+  const [favoritesFirst, setFavoritesFirst] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(FAVORITE_THEATERS_KEY) ?? "[]");
+      if (Array.isArray(stored)) {
+        setFavoriteTheaters(new Set(stored.filter((id): id is number => typeof id === "number")));
+      }
+    } catch {
+      localStorage.removeItem(FAVORITE_THEATERS_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("range");
@@ -88,7 +108,10 @@ export default function TimelineView({
     () => screenings.filter((screening) => inRange(screening.startTime, range, isToday)),
     [screenings, range, isToday]
   );
-  const groups = useMemo(() => groupScreenings(ranged), [ranged]);
+  const groups = useMemo(
+    () => groupScreenings(ranged, favoriteTheaters, favoritesFirst),
+    [favoriteTheaters, favoritesFirst, ranged]
+  );
 
   const openPeek = (screening: ScreeningCard, type: string | null) => {
     const previews = (eventPreviews[`${screening.movie.id}-${screening.theater.chain}`] ?? []).filter(
@@ -121,6 +144,16 @@ export default function TimelineView({
             {label}
           </button>
         ))}
+        {favoriteTheaters.size > 0 && (
+          <button
+            type="button"
+            onClick={() => setFavoritesFirst((current) => !current)}
+            aria-pressed={favoritesFirst}
+            className={`flex-none rounded-full border px-3 py-1.5 text-[11.5px] font-bold ${favoritesFirst ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
+          >
+            ★ 즐겨찾기 우선
+          </button>
+        )}
       </div>
 
       {groups.length === 0 ? (
@@ -166,6 +199,7 @@ export default function TimelineView({
                     <p className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-2">
                       <span className="h-[7px] w-[7px] rounded-full" style={{ background: CHAIN_COLOR[group.theater.chain] }} />
                       {group.theater.branchName}
+                      {favoriteTheaters.has(group.theater.id) && <span className="text-app" aria-label="즐겨찾는 극장">★</span>}
                     </p>
 
                     <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
