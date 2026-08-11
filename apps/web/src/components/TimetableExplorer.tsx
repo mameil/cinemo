@@ -28,6 +28,7 @@ interface HomeTimetableResponse {
   };
   updatedAt: string;
   goodsUpdatedAt: string;
+  goodsUpdatedBySource?: Partial<Record<Chain, string>>;
   movies: MovieMiniResponse[];
   screenings: ScreeningCard[];
   eventPreviews: Record<string, EventPreview[]>;
@@ -443,6 +444,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
         coverage={data?.coverage ?? { label: "로딩 중…", theaterCount: 0 }}
         updatedAt={data?.updatedAt ?? new Date().toISOString()}
         goodsUpdatedAt={data?.goodsUpdatedAt ?? new Date().toISOString()}
+        goodsUpdatedBySource={data?.goodsUpdatedBySource}
         view={view}
         onViewChange={handleViewChange}
         selectedDate={selectedDate}

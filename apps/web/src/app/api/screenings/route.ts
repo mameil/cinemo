@@ -235,15 +235,23 @@ async function handleGet(req: NextRequest) {
     if (r.updatedAt && r.updatedAt > latestUpdate) latestUpdate = r.updatedAt;
   }
 
-  let latestGoodsUpdate = "";
-  for (const r of activeStockRows) {
-    // goodsStock에는 updatedAt이 없으므로 activeStockRows 쿼리에 추가 필요
-  }
-  // goods_stock의 최신 updatedAt 별도 조회
-  const [goodsLatest] = await db
-    .select({ latest: sql<string>`MAX(${goodsStock.updatedAt})` })
-    .from(goodsStock);
-  const goodsUpdatedAt = goodsLatest?.latest ?? "";
+  // 굿즈 재고는 한 수집처만 갱신돼도 전체가 최신처럼 보이지 않도록 체인별로 집계한다.
+  const goodsLatestRows = await db
+    .select({
+      chain: events.chain,
+      latest: sql<string | null>`MAX(${goodsStock.updatedAt})`,
+    })
+    .from(goodsStock)
+    .innerJoin(goodies, eq(goodsStock.goodieId, goodies.id))
+    .innerJoin(events, eq(goodies.eventId, events.id))
+    .groupBy(events.chain);
+  const goodsUpdatedBySource = Object.fromEntries(
+    goodsLatestRows.filter((row) => row.latest).map((row) => [row.chain, row.latest])
+  );
+  const goodsUpdatedAt = goodsLatestRows.reduce(
+    (latest, row) => row.latest && row.latest > latest ? row.latest : latest,
+    "",
+  );
 
   // 5) 카드 변환
   const cards: ScreeningCard[] = rows.map((r) => {
@@ -454,6 +462,7 @@ async function handleGet(req: NextRequest) {
       },
       updatedAt: latestUpdate || new Date().toISOString(),
       goodsUpdatedAt: goodsUpdatedAt || new Date().toISOString(),
+      goodsUpdatedBySource,
       upcomingMovies,
       goodieMovies,
       indieTheaters,
@@ -476,6 +485,7 @@ async function handleGet(req: NextRequest) {
     },
     updatedAt: latestUpdate || new Date().toISOString(),
     goodsUpdatedAt: goodsUpdatedAt || new Date().toISOString(),
+    goodsUpdatedBySource,
     movies: [...movieMap.values()],
     screenings: cards,
     eventPreviews,

@@ -74,6 +74,7 @@ interface Props {
   coverage: CoverageWithTheaters;
   updatedAt: string;
   goodsUpdatedAt: string;
+  goodsUpdatedBySource?: Partial<Record<Chain, string>>;
   view: "movie" | "time";
   onViewChange: (v: "movie" | "time") => void;
   selectedDate: string;
@@ -110,7 +111,7 @@ const CHAIN_COLORS: Record<string, string> = {
 
 export default function HomeHeader({
   queryBar,
-  coverage, updatedAt, goodsUpdatedAt, view, onViewChange, selectedDate, onDateChange,
+  coverage, updatedAt, goodsUpdatedAt, goodsUpdatedBySource, view, onViewChange, selectedDate, onDateChange,
   afterNow, onAfterNowChange, goodieOnly, onGoodieOnlyChange, isToday,
   excludedTheaters, onToggleTheater, onToggleArea,
   excludedChains, onToggleChain,
@@ -124,6 +125,11 @@ export default function HomeHeader({
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const updated = new Date(updatedAt);
   const goodsUpdated = new Date(goodsUpdatedAt);
+  const goodsSourceLabels: Record<Chain, string> = { CGV: "CGV", LOTTE: "롯데", MEGA: "메가", INDIE: "독립" };
+  const goodsSourceSummary = CHAINS
+    .filter(({ key }) => goodsUpdatedBySource?.[key])
+    .map(({ key }) => `${goodsSourceLabels[key]} ${ago(new Date(goodsUpdatedBySource![key]!))}`)
+    .join(" · ");
 
   function ago(d: Date) {
     const mins = Math.round((Date.now() - d.getTime()) / 60000);
@@ -210,7 +216,7 @@ export default function HomeHeader({
           <span className={refreshing ? "inline-block animate-spin" : ""}>↻</span>
           {" "}상영 {hhmm(updated)} · {ago(updated)}
           <br />
-          🎁 굿즈 {hhmm(goodsUpdated)} · {ago(goodsUpdated)}
+          🎁 {goodsSourceSummary || `굿즈 ${hhmm(goodsUpdated)} · ${ago(goodsUpdated)}`}
         </button>
       </div>
 
