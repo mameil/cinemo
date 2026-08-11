@@ -184,6 +184,18 @@ export default function EventsFeedPage() {
     });
   };
 
+  const resetResultFilters = () => {
+    setScope("all");
+    setChainFilter(new Set());
+    setCategoryFilter(new Set());
+    setExcludedMovies(new Set());
+    setExcludedEvents(new Set());
+    try {
+      sessionStorage.removeItem("cinemo-feed-excluded");
+      sessionStorage.removeItem("cinemo-feed-excluded-events");
+    } catch {}
+  };
+
   return (
     <main className="mx-auto max-w-[980px]">
       {/* 상단 네비 */}
@@ -296,9 +308,9 @@ export default function EventsFeedPage() {
 
       {/* 피드 그리드 */}
       {loading ? (
-        <div className="py-20 text-center text-sm text-ink-3">불러오는 중…</div>
+        <div className="py-20 text-center text-sm text-ink-3" role="status">특전을 불러오는 중…</div>
       ) : loadError ? (
-        <div className="py-20 text-center text-sm text-ink-3">
+        <div className="py-20 text-center text-sm text-ink-3" role="alert">
           데이터를 불러오지 못했어요 (일시적인 문제일 수 있어요)
           <br />
           <button
@@ -309,7 +321,17 @@ export default function EventsFeedPage() {
           </button>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="py-20 text-center text-sm text-ink-3">조건에 맞는 특전이 없어요</div>
+        <div className="py-20 text-center text-sm text-ink-3" role="status">
+          조건에 맞는 특전이 없어요
+          <br />
+          <button
+            type="button"
+            onClick={resetResultFilters}
+            className="mt-3 rounded-full border border-line bg-panel px-4 py-1.5 text-xs font-semibold text-ink-2 hover:border-goodie hover:text-goodie"
+          >
+            전체 특전 보기
+          </button>
+        </div>
       ) : view === "list" ? (
         /* 리스트 뷰 — 한 줄에 하나, 훑기용 */
         <div className="flex flex-col gap-1.5 p-3">

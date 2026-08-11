@@ -150,6 +150,7 @@ export default function TheatersPage() {
   const [data, setData] = useState<TheaterResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
   const [query, setQuery] = useState("");
   const [favoriteTheaters, setFavoriteTheaters] = useState<Set<number>>(new Set());
   const [compareMode, setCompareMode] = useState(false);
@@ -181,7 +182,7 @@ export default function TheatersPage() {
       .then(setData)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [initialized, selectedDate]);
+  }, [initialized, selectedDate, retryTick]);
 
   const dates = datesUntil(data?.coverage.maxDate);
   const coverageByDate = new Map((data?.coverage.dateCoverage ?? []).map((item) => [item.date, item]));
@@ -317,13 +318,37 @@ export default function TheatersPage() {
 
       <div className="space-y-6 px-4 py-5">
         {loading ? (
-          <div className="space-y-2">
+          <div className="space-y-2" role="status" aria-label="극장 시간표 불러오는 중">
             {[0, 1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-line-soft" />)}
           </div>
         ) : error ? (
-          <div className="rounded-xl border border-line p-6 text-center text-sm text-ink-3">극장 시간표를 불러오지 못했어요.</div>
+          <div className="rounded-xl border border-line p-6 text-center text-sm text-ink-3" role="alert">
+            극장 시간표를 불러오지 못했어요.
+            <br />
+            <button
+              type="button"
+              onClick={() => setRetryTick((tick) => tick + 1)}
+              className="mt-3 rounded-full border border-line bg-panel px-4 py-1.5 text-xs font-semibold text-ink-2 hover:border-app hover:text-app"
+            >
+              ↻ 다시 시도
+            </button>
+          </div>
         ) : sections.length === 0 && favoriteCards.length === 0 ? (
-          <div className="rounded-xl bg-ground p-6 text-center text-sm text-ink-3">검색한 극장을 찾지 못했어요.</div>
+          <div className="rounded-xl bg-ground p-6 text-center text-sm text-ink-3" role="status">
+            검색한 극장을 찾지 못했어요.
+            {query && (
+              <>
+                <br />
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="mt-3 rounded-full border border-line bg-panel px-4 py-1.5 text-xs font-semibold text-ink-2 hover:border-app hover:text-app"
+                >
+                  검색어 지우기
+                </button>
+              </>
+            )}
+          </div>
         ) : <>
           {favoriteCards.length > 0 && (
             <section>

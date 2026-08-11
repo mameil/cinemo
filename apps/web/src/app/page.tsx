@@ -174,11 +174,11 @@ export default function DiscoverHome() {
         </section>
 
         {loading ? (
-          <div className="space-y-3" aria-label="시간표 불러오는 중">
+          <div className="space-y-3" role="status" aria-label="시간표 불러오는 중">
             {[0, 1, 2].map((item) => <div key={item} className="h-28 animate-pulse rounded-2xl bg-line-soft" />)}
           </div>
         ) : error ? (
-          <div className="rounded-2xl border border-line bg-panel p-6 text-center text-sm text-ink-3">
+          <div className="rounded-2xl border border-line bg-panel p-6 text-center text-sm text-ink-3" role="alert">
             시간표를 불러오지 못했어요.
             <button onClick={() => window.location.reload()} className="ml-2 font-bold text-app">다시 시도</button>
           </div>
