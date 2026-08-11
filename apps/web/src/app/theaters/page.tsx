@@ -18,6 +18,12 @@ interface TheaterResponse {
 }
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+const FAVORITE_THEATERS_KEY = "cinemo-favorite-theaters";
+
+type TheaterCard = TheaterInfo & {
+  items: ScreeningCard[];
+  next: string | null;
+};
 
 function dateString(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -46,6 +52,56 @@ function datesUntil(maxDate?: string | null) {
   });
 }
 
+function TheaterRow({
+  theater,
+  selectedDate,
+  favorite,
+  onToggleFavorite,
+}: {
+  theater: TheaterCard;
+  selectedDate: string;
+  favorite: boolean;
+  onToggleFavorite: (theaterId: number) => void;
+}) {
+  const hasSchedule = theater.items.length > 0;
+  const color = theater.chain === "CGV"
+    ? "var(--color-cgv)"
+    : theater.chain === "LOTTE"
+      ? "var(--color-lotte)"
+      : theater.chain === "MEGA"
+        ? "var(--color-mega)"
+        : "#555";
+
+  return (
+    <div className={`flex items-center border-b border-line-soft last:border-b-0 ${hasSchedule ? "hover:bg-ground" : "opacity-60"}`}>
+      <Link
+        href={hasSchedule ? `/timeline?date=${selectedDate}&theater=${theater.id}` : `/theaters?date=${selectedDate}`}
+        aria-disabled={!hasSchedule}
+        className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3"
+      >
+        <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: color }} />
+        <div className="min-w-0 flex-1">
+          <b className="block truncate text-[13px]">{theater.branchName}</b>
+          <small className="text-[10px] text-ink-3">
+            {!hasSchedule ? "일정 없음" : theater.next ? `다음 상영 ${theater.next}` : "오늘 상영 종료"}
+          </small>
+        </div>
+        {hasSchedule && <span className="text-[11px] font-bold text-app">{theater.items.length}회</span>}
+        <span className="text-xs text-ink-3">›</span>
+      </Link>
+      <button
+        type="button"
+        onClick={() => onToggleFavorite(theater.id)}
+        aria-label={`${theater.branchName} ${favorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}`}
+        aria-pressed={favorite}
+        className={`mr-2 flex h-10 w-10 flex-none items-center justify-center rounded-full text-lg ${favorite ? "text-app" : "text-ink-3 hover:bg-line-soft"}`}
+      >
+        {favorite ? "★" : "☆"}
+      </button>
+    </div>
+  );
+}
+
 export default function TheatersPage() {
   const router = useRouter();
   const [initialized, setInitialized] = useState(false);
@@ -54,10 +110,19 @@ export default function TheatersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [query, setQuery] = useState("");
+  const [favoriteTheaters, setFavoriteTheaters] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const requestedDate = new URLSearchParams(window.location.search).get("date");
     if (requestedDate && requestedDate >= dateString()) setSelectedDate(requestedDate);
+    try {
+      const stored = JSON.parse(localStorage.getItem(FAVORITE_THEATERS_KEY) ?? "[]");
+      if (Array.isArray(stored)) {
+        setFavoriteTheaters(new Set(stored.filter((id): id is number => typeof id === "number")));
+      }
+    } catch {
+      localStorage.removeItem(FAVORITE_THEATERS_KEY);
+    }
     setInitialized(true);
   }, []);
 
@@ -95,8 +160,18 @@ export default function TheatersPage() {
     });
   }, [data, isToday]);
 
+  const matchingTheaters = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return theaterCards.filter((theater) => theater.branchName.toLowerCase().includes(normalizedQuery));
+  }, [query, theaterCards]);
+
+  const favoriteCards = useMemo(() => matchingTheaters
+    .filter((theater) => favoriteTheaters.has(theater.id))
+    .sort((a, b) => Number(b.items.length > 0) - Number(a.items.length > 0) || a.branchName.localeCompare(b.branchName)),
+  [favoriteTheaters, matchingTheaters]);
+
   const sections = useMemo(() => {
-    const filtered = theaterCards.filter((theater) => theater.branchName.toLowerCase().includes(query.trim().toLowerCase()));
+    const filtered = matchingTheaters.filter((theater) => !favoriteTheaters.has(theater.id));
     const map = new Map<string, typeof filtered>();
     for (const theater of filtered) {
       const area = theater.chain === "INDIE" ? "독립영화관" : theater.area;
@@ -111,11 +186,21 @@ export default function TheatersPage() {
         area,
         theaters: theaters.sort((a, b) => Number(b.items.length > 0) - Number(a.items.length > 0) || a.branchName.localeCompare(b.branchName)),
       }));
-  }, [query, theaterCards]);
+  }, [favoriteTheaters, matchingTheaters]);
 
   function changeDate(nextDate: string) {
     setSelectedDate(nextDate);
     router.push(`/theaters?date=${nextDate}`);
+  }
+
+  function toggleFavorite(theaterId: number) {
+    setFavoriteTheaters((current) => {
+      const next = new Set(current);
+      if (next.has(theaterId)) next.delete(theaterId);
+      else next.add(theaterId);
+      localStorage.setItem(FAVORITE_THEATERS_KEY, JSON.stringify([...next]));
+      return next;
+    });
   }
 
   return (
@@ -168,9 +253,32 @@ export default function TheatersPage() {
           </div>
         ) : error ? (
           <div className="rounded-xl border border-line p-6 text-center text-sm text-ink-3">극장 시간표를 불러오지 못했어요.</div>
-        ) : sections.length === 0 ? (
+        ) : sections.length === 0 && favoriteCards.length === 0 ? (
           <div className="rounded-xl bg-ground p-6 text-center text-sm text-ink-3">검색한 극장을 찾지 못했어요.</div>
-        ) : sections.map((section) => (
+        ) : <>
+          {favoriteCards.length > 0 && (
+            <section>
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-sm font-extrabold">즐겨찾는 극장</h2>
+                <span className="text-[10px] text-ink-3">{favoriteCards.length}곳</span>
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-app/30 bg-panel">
+                {favoriteCards.map((theater) => (
+                  <TheaterRow
+                    key={theater.id}
+                    theater={theater}
+                    selectedDate={selectedDate}
+                    favorite
+                    onToggleFavorite={toggleFavorite}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+          {favoriteCards.length === 0 && !query && (
+            <p className="rounded-xl bg-ground px-3.5 py-2.5 text-[11px] text-ink-3">극장 오른쪽의 ☆를 누르면 자주 가는 극장을 위에 모아볼 수 있어요.</p>
+          )}
+          {sections.map((section) => (
           <section key={section.area}>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-extrabold">{section.area}</h2>
@@ -178,26 +286,18 @@ export default function TheatersPage() {
             </div>
             <div className="overflow-hidden rounded-2xl border border-line bg-panel">
               {section.theaters.map((theater) => (
-                <Link
+                <TheaterRow
                   key={theater.id}
-                  href={theater.items.length > 0 ? `/timeline?date=${selectedDate}&theater=${theater.id}` : `/theaters?date=${selectedDate}`}
-                  aria-disabled={theater.items.length === 0}
-                  className={`flex items-center gap-3 border-b border-line-soft px-3.5 py-3 last:border-b-0 ${theater.items.length > 0 ? "hover:bg-ground" : "opacity-50"}`}
-                >
-                  <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: theater.chain === "CGV" ? "var(--color-cgv)" : theater.chain === "LOTTE" ? "var(--color-lotte)" : theater.chain === "MEGA" ? "var(--color-mega)" : "#555" }} />
-                  <div className="min-w-0 flex-1">
-                    <b className="block truncate text-[13px]">{theater.branchName}</b>
-                    <small className="text-[10px] text-ink-3">
-                      {theater.items.length === 0 ? "일정 없음" : theater.next ? `다음 상영 ${theater.next}` : "오늘 상영 종료"}
-                    </small>
-                  </div>
-                  {theater.items.length > 0 && <span className="text-[11px] font-bold text-app">{theater.items.length}회</span>}
-                  <span className="text-xs text-ink-3">›</span>
-                </Link>
+                  theater={theater}
+                  selectedDate={selectedDate}
+                  favorite={false}
+                  onToggleFavorite={toggleFavorite}
+                />
               ))}
             </div>
           </section>
-        ))}
+          ))}
+        </>}
       </div>
 
       <AppNav active="theaters" date={selectedDate} />
