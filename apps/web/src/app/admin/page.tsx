@@ -23,11 +23,21 @@ interface RunRequest {
   requestedAt: string | null;
   pending: boolean;
 }
+interface ReviewProgram {
+  id: number;
+  originalTitle: string;
+  baseTitle: string;
+  badges: string[];
+  hasPoster: boolean;
+  screeningCount: number;
+  publishedThrough: string;
+}
 interface Payload {
   runs: Run[];
   summary: Run[];
   totals: Totals;
   request?: RunRequest;
+  reviewPrograms?: ReviewProgram[];
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -134,6 +144,7 @@ export default function AdminPage() {
   const summary = data?.summary ?? [];
   const totals = data?.totals;
   const request = data?.request;
+  const reviewPrograms = data?.reviewPrograms ?? [];
   const errorCount = runs.filter((r) => r.status === "error").length;
 
   return (
@@ -220,6 +231,37 @@ export default function AdminPage() {
         <div className="mt-1.5 text-[10.5px] text-ink-3">
           {msg ?? "GitHub Actions를 즉시 실행합니다 (진행은 Actions 탭·아래 최신 상태에서)"}
         </div>
+      </div>
+
+      {/* 소스/기계별 최신 상태 */}
+      <div className="mb-5">
+        <div className="mb-2 flex items-center gap-2">
+          <h2 className="text-[12px] font-bold text-ink-2">특별 프로그램 검수</h2>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${reviewPrograms.length ? "bg-amber-50 text-amber-800" : "bg-ground text-ink-3"}`}>
+            {reviewPrograms.length}건
+          </span>
+        </div>
+        {reviewPrograms.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-amber-200 bg-amber-50/40">
+            {reviewPrograms.map((program) => (
+              <div key={program.id} className="border-b border-amber-100 px-3 py-2.5 last:border-b-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <b className="text-[12.5px]">{program.baseTitle}</b>
+                  {program.badges.map((badge) => (
+                    <span key={badge} className="rounded-full border border-app/25 bg-app-tint px-1.5 py-px text-[9.5px] font-bold text-app">{badge}</span>
+                  ))}
+                  <span className={`ml-auto text-[10px] font-bold ${program.hasPoster ? "text-ok" : "text-amber-800"}`}>
+                    {program.hasPoster ? "대표 이미지 있음" : "포스터 없음"}
+                  </span>
+                </div>
+                <p className="mt-1 truncate text-[10.5px] text-ink-3" title={program.originalTitle}>{program.originalTitle}</p>
+                <p className="mt-0.5 text-[10px] text-ink-3">예정 {program.screeningCount}회 · {program.publishedThrough}까지</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-xl border border-line bg-white px-3 py-2.5 text-[11px] text-ink-3">현재 검수가 필요한 특별 프로그램이 없습니다.</p>
+        )}
       </div>
 
       {/* 소스/기계별 최신 상태 */}
