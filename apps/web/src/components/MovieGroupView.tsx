@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ScreeningCard, MovieMini, EventPreview, GoodieStockLite } from "@mock/types";
 import { CHAIN_COLOR, GOODIE_BADGE_CLASS, GOODIE_CHIP_CLASS, cleanGoodieName, seatStatus, shortScreenName } from "@/lib/utils";
 import { requiredFormat, formatSatisfies } from "@/lib/event-rules";
@@ -15,6 +15,8 @@ interface MovieGroup {
 }
 
 type MovieSort = "next" | "popular" | "title" | "goodie";
+const INITIAL_MOVIE_COUNT = 12;
+const MOVIE_BATCH_SIZE = 8;
 
 function nextTime(group: MovieGroup, cutoff: string): string | null {
   return group.screenings
@@ -357,11 +359,33 @@ export default function MovieGroupView({
 }) {
   const [sort, setSort] = useState<MovieSort>("next");
   const [peek, setPeek] = useState<PeekTarget | null>(null);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_MOVIE_COUNT);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const now = new Date();
   const cutoff = isToday
     ? `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
     : "00:00";
-  const groups = groupByMovie(screenings, sort, cutoff);
+  const groups = useMemo(() => groupByMovie(screenings, sort, cutoff), [screenings, sort, cutoff]);
+  const visibleGroups = groups.slice(0, visibleCount);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_MOVIE_COUNT);
+  }, [screenings, sort]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || visibleCount >= groups.length) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCount((current) => Math.min(current + MOVIE_BATCH_SIZE, groups.length));
+        }
+      },
+      { rootMargin: "320px 0px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [groups.length, visibleCount]);
 
   return (
     <div className="flex flex-col gap-2.5 p-3">
@@ -381,9 +405,20 @@ export default function MovieGroupView({
           </select>
         </label>
       </div>
-      {groups.map((g) => (
+      {visibleGroups.map((g) => (
         <MovieGroupCard key={g.movie.id} g={g} eventPreviews={eventPreviews} goodieStock={goodieStock} onPeek={setPeek} cutoff={cutoff} />
       ))}
+      {visibleCount < groups.length && (
+        <div ref={loadMoreRef} className="py-2 text-center">
+          <button
+            type="button"
+            onClick={() => setVisibleCount((current) => Math.min(current + MOVIE_BATCH_SIZE, groups.length))}
+            className="rounded-full border border-line bg-panel px-4 py-1.5 text-[11px] font-bold text-ink-3 hover:border-app hover:text-app"
+          >
+            영화 더 보기 · {Math.min(visibleCount, groups.length)}/{groups.length}
+          </button>
+        </div>
+      )}
       {peek && <EventPeek target={peek} onClose={() => setPeek(null)} />}
     </div>
   );
