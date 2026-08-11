@@ -75,6 +75,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
   const [excludedMovies, setExcludedMovies] = useState<Set<number>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
   const [directTheaterId, setDirectTheaterId] = useState<number | null>(null);
+  const [directTheaterIds, setDirectTheaterIds] = useState<Set<number>>(new Set());
   const [initialShowTheaters, setInitialShowTheaters] = useState(false);
 
   // 쿼리 필터 (한 줄 검색 → 시간/장소/영화 레이어, 수동 필터와 별개)
@@ -88,6 +89,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     const saved = savedFallback ? loadFilters() : null;
     const requestedDate = params.get("date");
     const requestedTheater = Number(params.get("theater"));
+    const requestedTheaters = numberSet(params.get("theaters"));
     const from = params.get("from");
     const to = params.get("to");
 
@@ -99,6 +101,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     setExcludedChains(params.has("hideChains") ? chainSet(params.get("hideChains")) : new Set(saved?.excludedChains ?? []));
     setExcludedMovies(params.has("hideMovies") ? numberSet(params.get("hideMovies")) : new Set(saved?.excludedMovies ?? []));
     setDirectTheaterId(Number.isInteger(requestedTheater) && requestedTheater > 0 ? requestedTheater : null);
+    setDirectTheaterIds(requestedTheaters);
     setInitialShowTheaters(params.get("open") === "theaters");
     setQueryMovie(params.get("q") ?? params.get("query"));
     setQueryLocation(params.get("location"));
@@ -110,12 +113,17 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
       setExcludedChains(new Set());
       setExcludedMovies(new Set());
     }
+    if (requestedTheaters.size > 0) {
+      setExcludedTheaters(new Set());
+      setExcludedChains(new Set());
+      setExcludedMovies(new Set());
+    }
   }, [defaultView]);
 
   // 복원 (마운트 시 1회)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const hasUrlFilters = ["theater", "hideTheaters", "hideChains", "hideMovies", "goodie", "after", "q", "query", "location", "from", "to"].some((key) => params.has(key));
+    const hasUrlFilters = ["theater", "theaters", "hideTheaters", "hideChains", "hideMovies", "goodie", "after", "q", "query", "location", "from", "to"].some((key) => params.has(key));
     restoringUrl.current = true;
     applyUrlState(params, !hasUrlFilters && !params.has("date"));
     setInitialized(true);
@@ -136,6 +144,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     params.delete("open");
     const setOrDelete = (key: string, value: string | null) => value ? params.set(key, value) : params.delete(key);
     setOrDelete("theater", directTheaterId ? String(directTheaterId) : null);
+    setOrDelete("theaters", directTheaterIds.size ? [...directTheaterIds].sort((a, b) => a - b).join(",") : null);
     setOrDelete("hideTheaters", excludedTheaters.size ? [...excludedTheaters].sort((a, b) => a - b).join(",") : null);
     setOrDelete("hideChains", excludedChains.size ? [...excludedChains].sort().join(",") : null);
     setOrDelete("hideMovies", excludedMovies.size ? [...excludedMovies].sort((a, b) => a - b).join(",") : null);
@@ -147,7 +156,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     setOrDelete("to", queryTime?.to ?? null);
     const query = params.toString();
     window.history.pushState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
-  }, [initialized, selectedDate, directTheaterId, excludedTheaters, excludedChains, excludedMovies, goodieOnly, afterNow, queryMovie, queryLocation, queryTime]);
+  }, [initialized, selectedDate, directTheaterId, directTheaterIds, excludedTheaters, excludedChains, excludedMovies, goodieOnly, afterNow, queryMovie, queryLocation, queryTime]);
 
   useEffect(() => {
     const restore = () => {
@@ -245,6 +254,8 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
   const handleResetTheaters = useCallback(() => {
     setExcludedTheaters(new Set());
     setExcludedChains(new Set());
+    setDirectTheaterId(null);
+    setDirectTheaterIds(new Set());
   }, []);
 
   // ── 쿼리 한 줄 처리 ──
@@ -298,13 +309,14 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
   // 쿼리 장소 → 극장 id 집합
   const queryTheaterIds = useMemo(() => {
     if (directTheaterId) return new Set([directTheaterId]);
+    if (directTheaterIds.size > 0) return directTheaterIds;
     if (!queryLocation || !data?.coverage.theaters) return null;
     return new Set(
       data.coverage.theaters
         .filter((t) => t.branchName.includes(queryLocation) || t.area.includes(queryLocation))
         .map((t) => t.id)
     );
-  }, [queryLocation, data, directTheaterId]);
+  }, [queryLocation, data, directTheaterId, directTheaterIds]);
 
   // 쿼리 영화 → 영화 id 집합 (해당 날짜 상영 영화와 대조)
   const queryMovieIds = useMemo(() => {
@@ -343,7 +355,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     if (!data) return [];
     let list = data.screenings;
 
-    if (!directTheaterId && excludedTheaters.size > 0) {
+    if (!directTheaterId && directTheaterIds.size === 0 && excludedTheaters.size > 0) {
       list = list.filter((s) => !excludedTheaters.has(s.theater.id));
     }
     if (excludedChains.size > 0) {
@@ -368,7 +380,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     }
 
     return list;
-  }, [data, directTheaterId, excludedTheaters, excludedChains, queryTheaterIds, queryTime, afterNow, isToday, goodieOnly, view]);
+  }, [data, directTheaterId, directTheaterIds, excludedTheaters, excludedChains, queryTheaterIds, queryTime, afterNow, isToday, goodieOnly, view]);
 
   // 선택된 극장에서 실제 상영 중인 영화만
   const availableMovies = useMemo(() => {
@@ -413,7 +425,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     return list;
   }, [theaterFiltered, excludedMovies, queryMovieIds]);
 
-  const hasTheaterFilter = excludedTheaters.size > 0 || excludedChains.size > 0;
+  const hasTheaterFilter = directTheaterId !== null || directTheaterIds.size > 0 || excludedTheaters.size > 0 || excludedChains.size > 0;
   const hasMovieFilter = excludedMovies.size > 0;
 
   return (

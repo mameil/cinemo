@@ -69,11 +69,17 @@ function TheaterRow({
   selectedDate,
   favorite,
   onToggleFavorite,
+  compareMode = false,
+  compareSelected = false,
+  onToggleCompare,
 }: {
   theater: TheaterCard;
   selectedDate: string;
   favorite: boolean;
   onToggleFavorite: (theaterId: number) => void;
+  compareMode?: boolean;
+  compareSelected?: boolean;
+  onToggleCompare?: (theaterId: number) => void;
 }) {
   const hasSchedule = theater.items.length > 0;
   const emptyLabel = theater.scheduleStatus === "closed" ? "쉼" : "일정 미등록";
@@ -90,6 +96,12 @@ function TheaterRow({
       <Link
         href={hasSchedule ? `/timeline?date=${selectedDate}&theater=${theater.id}` : `/theaters?date=${selectedDate}`}
         aria-disabled={!hasSchedule}
+        aria-pressed={compareMode ? compareSelected : undefined}
+        onClick={(event) => {
+          if (!compareMode || !hasSchedule) return;
+          event.preventDefault();
+          onToggleCompare?.(theater.id);
+        }}
         className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3"
       >
         <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: color }} />
@@ -101,9 +113,9 @@ function TheaterRow({
           <small className="ml-1 text-[9px] text-ink-3">· {updateLabel(theater.updatedAt)}</small>
         </div>
         {hasSchedule && <span className="text-[11px] font-bold text-app">{theater.items.length}회</span>}
-        <span className="text-xs text-ink-3">›</span>
+        <span className="text-xs text-ink-3">{compareMode ? (compareSelected ? "✓" : "+") : "›"}</span>
       </Link>
-      <button
+      {!compareMode && <button
         type="button"
         onClick={() => onToggleFavorite(theater.id)}
         aria-label={`${theater.branchName} ${favorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}`}
@@ -111,7 +123,7 @@ function TheaterRow({
         className={`mr-2 flex h-10 w-10 flex-none items-center justify-center rounded-full text-lg ${favorite ? "text-app" : "text-ink-3 hover:bg-line-soft"}`}
       >
         {favorite ? "★" : "☆"}
-      </button>
+      </button>}
     </div>
   );
 }
@@ -125,6 +137,8 @@ export default function TheatersPage() {
   const [error, setError] = useState(false);
   const [query, setQuery] = useState("");
   const [favoriteTheaters, setFavoriteTheaters] = useState<Set<number>>(new Set());
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareTheaters, setCompareTheaters] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const requestedDate = new URLSearchParams(window.location.search).get("date");
@@ -217,6 +231,25 @@ export default function TheatersPage() {
     });
   }
 
+  function toggleCompare(theaterId: number) {
+    setCompareTheaters((current) => {
+      const next = new Set(current);
+      if (next.has(theaterId)) next.delete(theaterId);
+      else next.add(theaterId);
+      return next;
+    });
+  }
+
+  function toggleCompareMode() {
+    setCompareMode((current) => !current);
+    setCompareTheaters(new Set());
+  }
+
+  function openComparison() {
+    if (compareTheaters.size < 2) return;
+    router.push(`/timeline?date=${selectedDate}&theaters=${[...compareTheaters].sort((a, b) => a - b).join(",")}`);
+  }
+
   return (
     <main className="mx-auto min-h-screen max-w-[980px] pb-12">
       <header className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 pb-3 pt-4 backdrop-blur-sm">
@@ -226,7 +259,13 @@ export default function TheatersPage() {
             <p className="text-[11px] font-bold tracking-[0.16em] text-app">THEATERS</p>
             <h1 className="text-lg font-extrabold">극장별 시간표</h1>
           </div>
-          <span className="ml-auto text-[11px] text-ink-3">{data?.coverage.theaterCount ?? 0}개 극장</span>
+          <button
+            type="button"
+            onClick={toggleCompareMode}
+            className={`ml-auto rounded-full border px-2.5 py-1 text-[11px] font-bold ${compareMode ? "border-app bg-app-tint text-app" : "border-line text-ink-3"}`}
+          >
+            {compareMode ? "비교 취소" : "극장 비교"}
+          </button>
         </div>
 
         <div className="mt-3 flex items-center gap-2 rounded-xl border border-line bg-ground px-3 py-2 focus-within:border-app">
@@ -284,6 +323,9 @@ export default function TheatersPage() {
                     selectedDate={selectedDate}
                     favorite
                     onToggleFavorite={toggleFavorite}
+                    compareMode={compareMode}
+                    compareSelected={compareTheaters.has(theater.id)}
+                    onToggleCompare={toggleCompare}
                   />
                 ))}
               </div>
@@ -306,6 +348,9 @@ export default function TheatersPage() {
                   selectedDate={selectedDate}
                   favorite={false}
                   onToggleFavorite={toggleFavorite}
+                  compareMode={compareMode}
+                  compareSelected={compareTheaters.has(theater.id)}
+                  onToggleCompare={toggleCompare}
                 />
               ))}
             </div>
@@ -313,6 +358,19 @@ export default function TheatersPage() {
           ))}
         </>}
       </div>
+
+      {compareMode && (
+        <div className="fixed inset-x-0 bottom-16 z-20 mx-auto max-w-[980px] px-4">
+          <button
+            type="button"
+            onClick={openComparison}
+            disabled={compareTheaters.size < 2}
+            className="w-full rounded-2xl bg-app px-4 py-3 text-sm font-extrabold text-white shadow-lg disabled:bg-ink-3 disabled:opacity-70"
+          >
+            {compareTheaters.size < 2 ? `비교할 극장을 ${2 - compareTheaters.size}곳 더 선택하세요` : `${compareTheaters.size}개 극장 시간표 비교`}
+          </button>
+        </div>
+      )}
 
       <AppNav active="theaters" date={selectedDate} />
     </main>
