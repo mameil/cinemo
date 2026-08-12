@@ -6,6 +6,7 @@ import type { ScreeningCard, EventPreview } from "@mock/types";
 import { CHAIN_COLOR, GOODIE_BADGE_CLASS, seatStatus, formatLabel, timeSlot } from "@/lib/utils";
 import EventPeek, { type PeekTarget } from "@/components/EventPeek";
 import { parseProgramTitle } from "@/lib/program-title";
+import { GiftIcon, FilmIcon, CheckIcon, StarIcon } from "@/components/icons";
 
 type TimeRange = "now" | "evening" | "late" | "all";
 const FAVORITE_THEATERS_KEY = "cinemo-favorite-theaters";
@@ -176,9 +177,9 @@ export default function TimelineView({
             key={key}
             onClick={() => selectRange(key)}
             aria-pressed={range === key}
-            className={`flex-none rounded-full border px-3 py-1.5 text-[11.5px] font-bold ${range === key ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
+            className={`inline-flex flex-none items-center gap-1 rounded-full border px-3 py-1.5 text-[11.5px] font-bold ${range === key ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
           >
-            {range === key && <span aria-hidden="true">✓ </span>}{label}
+            <CheckIcon size={11} className={range === key ? "" : "opacity-0"} />{label}
           </button>
         ))}
         {favoriteTheaters.size > 0 && (
@@ -186,9 +187,9 @@ export default function TimelineView({
             type="button"
             onClick={() => setFavoritesFirst((current) => !current)}
             aria-pressed={favoritesFirst}
-            className={`flex-none rounded-full border px-3 py-1.5 text-[11.5px] font-bold ${favoritesFirst ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
+            className={`inline-flex flex-none items-center gap-1 rounded-full border px-3 py-1.5 text-[11.5px] font-bold ${favoritesFirst ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
           >
-            {favoritesFirst ? "✓ " : "★ "}즐겨찾기 우선
+            {favoritesFirst ? <CheckIcon size={11} /> : <StarIcon size={11} />}즐겨찾기 우선
           </button>
         )}
       </div>
@@ -200,9 +201,9 @@ export default function TimelineView({
             type="button"
             onClick={() => selectPriorityRegion(null)}
             aria-pressed={priorityRegion === null}
-            className={`flex-none rounded-full border px-2.5 py-1 text-[10.5px] font-bold ${priorityRegion === null ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
+            className={`inline-flex flex-none items-center gap-1 rounded-full border px-2.5 py-1 text-[10.5px] font-bold ${priorityRegion === null ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
           >
-            {priorityRegion === null && <span aria-hidden="true">✓ </span>}해제
+            <CheckIcon size={10} className={priorityRegion === null ? "" : "opacity-0"} />해제
           </button>
           {regions.map((region) => (
             <button
@@ -210,9 +211,9 @@ export default function TimelineView({
               type="button"
               onClick={() => selectPriorityRegion(region)}
               aria-pressed={priorityRegion === region}
-              className={`flex-none rounded-full border px-2.5 py-1 text-[10.5px] font-bold ${priorityRegion === region ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
+              className={`inline-flex flex-none items-center gap-1 rounded-full border px-2.5 py-1 text-[10.5px] font-bold ${priorityRegion === region ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-3"}`}
             >
-              {priorityRegion === region && <span aria-hidden="true">✓ </span>}{region}
+              <CheckIcon size={10} className={priorityRegion === region ? "" : "opacity-0"} />{region}
             </button>
           ))}
         </div>
@@ -248,7 +249,7 @@ export default function TimelineView({
                         className="h-full w-[42px] object-cover bg-[#dfe4ea]"
                       />
                     ) : (
-                      <div className="flex h-full min-h-20 w-[42px] items-center justify-center bg-line-soft text-[15px]">🎞️</div>
+                      <div className="flex h-full min-h-20 w-[42px] items-center justify-center bg-line-soft text-[#aab1bb]"><FilmIcon size={15} /></div>
                     )}
                   </Link>
 
@@ -269,7 +270,7 @@ export default function TimelineView({
                     <p className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-2">
                       <span className="h-[7px] w-[7px] rounded-full" style={{ background: CHAIN_COLOR[group.theater.chain] }} />
                       {group.theater.branchName}
-                      {favoriteTheaters.has(group.theater.id) && <span className="text-app" aria-label="즐겨찾는 극장">★</span>}
+                      {favoriteTheaters.has(group.theater.id) && <span className="text-app" aria-label="즐겨찾는 극장"><StarIcon size={11} fill="currentColor" /></span>}
                     </p>
 
                     <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
@@ -295,7 +296,7 @@ export default function TimelineView({
 
                     {eventTypes.length > 0 && (
                       <div className="mt-1.5 flex items-center gap-1.5">
-                        <span className="text-[11px]">🎁</span>
+                        <GiftIcon size={12} className="text-goodie" />
                         {eventTypes.slice(0, 2).map((type) => (
                           <button
                             key={type}

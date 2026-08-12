@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef } from "react";
 import type { EventPreview } from "@mock/types";
 import { GOODIE_BADGE_CLASS } from "@/lib/utils";
+import { ImageIcon } from "@/components/icons";
 
 const CHAIN_LABEL: Record<string, string> = { CGV: "CGV", LOTTE: "롯데", MEGA: "메가", INDIE: "독립" };
 const CHAIN_CLASS: Record<string, string> = { CGV: "bg-cgv", LOTTE: "bg-lotte", MEGA: "bg-mega", INDIE: "bg-[#555]" };
@@ -176,7 +177,7 @@ export default function EventPeek({ target, onClose }: { target: PeekTarget; onC
                 </>
               ) : (
                 <div className="flex items-center justify-center gap-1.5 border-t border-line-soft bg-ground py-5 text-[11.5px] text-ink-3">
-                  🖼️ {CHAIN_LABEL[it.chain] ?? it.chain} 특전 이미지 미제공
+                  <ImageIcon size={13} /> {CHAIN_LABEL[it.chain] ?? it.chain} 특전 이미지 미제공
                 </div>
               )}
             </div>

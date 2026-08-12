@@ -4,8 +4,10 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ScreeningCard } from "@mock/types";
-import type { DateCoverage } from "@/components/HomeHeader";
+import { localDateString, type DateCoverage } from "@/lib/dates";
+import DateStrip from "@/components/DateStrip";
 import AppNav from "@/components/AppNav";
+import { SearchIcon, GiftIcon, FilmIcon, HomeIcon, ClockIcon } from "@/components/icons";
 
 interface HomeResponse {
   date: string;
@@ -24,30 +26,6 @@ interface HomeResponse {
     screeningCount: number;
     next: string | null;
   }[];
-}
-
-const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
-
-function localDateString(date = new Date()) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function buildDates(maxDate?: string | null) {
-  const today = new Date();
-  const todayString = localDateString(today);
-  const last = maxDate && maxDate >= todayString ? new Date(`${maxDate}T00:00:00`) : null;
-  const diff = last ? Math.floor((last.getTime() - new Date(`${todayString}T00:00:00`).getTime()) / 86_400_000) + 1 : 8;
-  const count = Math.min(Math.max(diff, 1), 21);
-
-  return Array.from({ length: count }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() + index);
-    return {
-      date: localDateString(date),
-      day: date.getDate(),
-      label: index === 0 ? "오늘" : index === 1 ? "내일" : DAY_NAMES[date.getDay()],
-    };
-  });
 }
 
 export default function DiscoverHome() {
@@ -81,7 +59,6 @@ export default function DiscoverHome() {
       .finally(() => setLoading(false));
   }, [selectedDate]);
 
-  const dates = buildDates(data?.coverage.maxDate);
   const coverageByDate = new Map((data?.coverage.dateCoverage ?? []).map((item) => [item.date, item]));
   const selectedCoverage = coverageByDate.get(selectedDate);
   const isToday = selectedDate === localDateString();
@@ -106,13 +83,13 @@ export default function DiscoverHome() {
             <p className="text-[11px] font-bold tracking-[0.18em] text-app">CINEMO</p>
             <h1 className="text-xl font-extrabold tracking-tight">오늘, 어떤 영화를 볼까요?</h1>
           </div>
-          <Link href="/events" className="rounded-full border border-goodie-line bg-goodie-tint/60 px-3 py-1.5 text-xs font-bold text-goodie">
-            🎁 특전
+          <Link href="/events" className="inline-flex items-center gap-1.5 rounded-full border border-goodie-line bg-goodie-tint/60 px-3 py-1.5 text-xs font-bold text-goodie">
+            <GiftIcon size={12} /> 특전
           </Link>
         </div>
 
         <form onSubmit={submitSearch} className="mt-3 flex items-center gap-2 rounded-xl border border-line bg-ground px-3 py-2 focus-within:border-app">
-          <span aria-hidden="true">🔍</span>
+          <SearchIcon size={15} className="text-ink-3" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -123,26 +100,13 @@ export default function DiscoverHome() {
           {search.trim() && <button className="text-xs font-bold text-app">찾기</button>}
         </form>
 
-        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5">
-          {dates.map((item) => {
-            const active = item.date === selectedDate;
-            const status = coverageByDate.get(item.date);
-            return (
-              <button
-                key={item.date}
-                onClick={() => changeDate(item.date)}
-                aria-current={active ? "date" : undefined}
-                className={`flex-none rounded-xl border px-3 py-1.5 text-center ${active ? "border-ink bg-ink text-white" : "border-line bg-panel text-ink"}`}
-              >
-                <small className={`block text-[10px] ${active ? "text-white/70" : "text-ink-3"}`}>{item.label}</small>
-                <b className="block text-[15px] leading-tight">{active && <span className="mr-0.5" aria-hidden="true">✓</span>}{item.day}</b>
-                <span className={`mt-0.5 block text-[9px] ${active ? "text-white/75" : "text-ink-3"}`}>
-                  {status ? `${status.theaterCount}개 극장` : "일정 없음"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <DateStrip
+          selectedDate={selectedDate}
+          onChange={changeDate}
+          maxDate={data?.coverage.maxDate}
+          dateCoverage={data?.coverage.dateCoverage}
+          loading={!data}
+        />
       </header>
 
       <div className="space-y-7 px-4 py-5">
@@ -156,17 +120,17 @@ export default function DiscoverHome() {
           <h2 className="mb-2.5 text-sm font-extrabold">어떻게 찾을까요?</h2>
           <div className="grid grid-cols-3 gap-2">
             <Link href={`/movies?date=${selectedDate}`} className="rounded-2xl border border-line bg-panel p-3 transition-colors hover:border-app">
-              <span className="text-xl">🎬</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-app-tint text-app"><FilmIcon size={15} /></span>
               <b className="mt-2 block text-sm">영화로</b>
               <small className="text-[10px] text-ink-3">포스터부터 보기</small>
             </Link>
             <Link href={`/theaters?date=${selectedDate}`} className="rounded-2xl border border-line bg-panel p-3 transition-colors hover:border-app">
-              <span className="text-xl">🏠</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-app-tint text-app"><HomeIcon size={15} /></span>
               <b className="mt-2 block text-sm">극장으로</b>
               <small className="text-[10px] text-ink-3">자주 가는 곳 보기</small>
             </Link>
             <Link href={`/timeline?date=${selectedDate}`} className="rounded-2xl border border-line bg-panel p-3 transition-colors hover:border-app">
-              <span className="text-xl">🕐</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-app-tint text-app"><ClockIcon size={15} /></span>
               <b className="mt-2 block text-sm">시간으로</b>
               <small className="text-[10px] text-ink-3">지금부터 보기</small>
             </Link>
@@ -199,7 +163,7 @@ export default function DiscoverHome() {
                       {screening.movie.posterUrl ? (
                         <img src={screening.movie.posterUrl.replace("/w500/", "/w200/")} alt={`${screening.movie.title} 포스터`} className="h-[160px] w-[112px] rounded-xl bg-line-soft object-cover shadow-sm" />
                       ) : (
-                        <div className="flex h-[160px] w-[112px] items-center justify-center rounded-xl bg-line-soft text-2xl">🎞️</div>
+                        <div className="flex h-[160px] w-[112px] items-center justify-center rounded-xl bg-line-soft text-[#aab1bb]"><FilmIcon size={24} /></div>
                       )}
                       <b className="mt-1.5 block truncate text-[13px]">{screening.movie.title}</b>
                       <span className="text-[11px] font-bold text-app">{screening.startTime}</span>
@@ -224,11 +188,11 @@ export default function DiscoverHome() {
                     <Link key={screening.movie.id} href={`/movies/${screening.movie.id}`} className="flex w-[230px] flex-none gap-3 rounded-2xl border border-goodie-line bg-goodie-tint/40 p-2.5">
                       {screening.movie.posterUrl ? (
                         <img src={screening.movie.posterUrl.replace("/w500/", "/w200/")} alt={`${screening.movie.title} 포스터`} className="h-[84px] w-[58px] rounded-lg object-cover" />
-                      ) : <div className="flex h-[84px] w-[58px] items-center justify-center rounded-lg bg-line-soft">🎞️</div>}
+                      ) : <div className="flex h-[84px] w-[58px] items-center justify-center rounded-lg bg-line-soft text-[#aab1bb]"><FilmIcon size={18} /></div>}
                       <div className="min-w-0 py-1">
                         <b className="block truncate text-[13px]">{screening.movie.title}</b>
-                        <span className="mt-2 inline-block rounded-full border border-goodie-line bg-white px-2 py-0.5 text-[10px] font-bold text-goodie">
-                          🎁 {screening.eventTypes.map((type) => type === "기타" ? "이벤트" : type).join(" · ")}
+                        <span className="mt-2 inline-flex items-center gap-1 rounded-full border border-goodie-line bg-white px-2 py-0.5 text-[10px] font-bold text-goodie">
+                          <GiftIcon size={10} /> {screening.eventTypes.map((type) => type === "기타" ? "이벤트" : type).join(" · ")}
                         </span>
                         <small className="mt-2 block truncate text-[10px] text-ink-3">{screening.theater.branchName}</small>
                       </div>

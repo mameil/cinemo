@@ -38,6 +38,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* 키보드 포커스 — 앱 액센트로 통일된 표시 */
+:focus-visible {
+  outline: 2px solid var(--color-app);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: #d3d8df transparent;

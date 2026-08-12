@@ -9,7 +9,9 @@ import TimelineView from "@/components/TimelineView";
 import QueryBar, { type QueryChip } from "@/components/QueryBar";
 import { parseQuery } from "@/lib/query-parse";
 import { saveFilters, loadFilters } from "@/lib/filter-store";
+import { localDateString, nowHHMM } from "@/lib/dates";
 import AppNav from "@/components/AppNav";
+import { GiftIcon, RefreshIcon } from "@/components/icons";
 
 interface MovieMiniResponse {
   id: number;
@@ -35,16 +37,6 @@ interface HomeTimetableResponse {
   goodieStock: Record<string, GoodieStockLite[]>;
 }
 
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function nowHHMM() {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
 function normTitle(s: string) {
   return s.toLowerCase().replace(/\s+/g, "");
 }
@@ -64,7 +56,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
   const router = useRouter();
   const [initialized, setInitialized] = useState(false);
   const [view, setView] = useState<"movie" | "time">(defaultView);
-  const [selectedDate, setSelectedDate] = useState(todayStr());
+  const [selectedDate, setSelectedDate] = useState(localDateString());
   const [data, setData] = useState<HomeTimetableResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -84,7 +76,10 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
   const [queryLocation, setQueryLocation] = useState<string | null>(null);
   const [queryTime, setQueryTime] = useState<{ from: string | null; to: string | null; label: string } | null>(null);
   const [queryDateLabel, setQueryDateLabel] = useState<string | null>(null);
+  // 하단 내비·홈 검색의 한 줄 입력(query=) — 데이터 도착 후 파서로 해석한다
+  const [pendingRawQuery, setPendingRawQuery] = useState<string | null>(null);
   const restoringUrl = useRef(false);
+  const lastPushedDate = useRef<string | null>(null);
 
   const applyUrlState = useCallback((params: URLSearchParams, savedFallback = false) => {
     const saved = savedFallback ? loadFilters() : null;
@@ -95,7 +90,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     const to = params.get("to");
 
     setView(defaultView);
-    setSelectedDate(requestedDate && requestedDate >= todayStr() ? requestedDate : saved?.selectedDate && saved.selectedDate >= todayStr() ? saved.selectedDate : todayStr());
+    setSelectedDate(requestedDate && requestedDate >= localDateString() ? requestedDate : saved?.selectedDate && saved.selectedDate >= localDateString() ? saved.selectedDate : localDateString());
     setAfterNow(params.has("after") ? params.get("after") === "1" : saved?.afterNow ?? defaultView === "time");
     setGoodieOnly(params.get("goodie") === "1" || (!params.has("goodie") && (saved?.goodieOnly ?? false)));
     setExcludedTheaters(params.has("hideTheaters") ? numberSet(params.get("hideTheaters")) : new Set(saved?.excludedTheaters ?? []));
@@ -104,7 +99,10 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     setDirectTheaterId(Number.isInteger(requestedTheater) && requestedTheater > 0 ? requestedTheater : null);
     setDirectTheaterIds(requestedTheaters);
     setInitialShowTheaters(params.get("open") === "theaters");
-    setQueryMovie(params.get("q") ?? params.get("query"));
+    // q=파싱된 영화 칩 / query=한 줄 원문 (하단 내비·홈 검색) — 원문은 그대로 영화 제목으로
+    // 오인하지 않고 데이터 도착 후 parseQuery로 시간·장소·영화를 분리한다.
+    setQueryMovie(params.get("q"));
+    setPendingRawQuery(params.get("query"));
     setQueryLocation(params.get("location"));
     setQueryTime(from || to ? { from, to, label: [from, to].filter(Boolean).join("~") } : null);
     setQueryDateLabel(null);
@@ -136,6 +134,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     if (!initialized) return;
     if (restoringUrl.current) {
       restoringUrl.current = false;
+      lastPushedDate.current = selectedDate;
       return;
     }
     const params = new URLSearchParams(window.location.search);
@@ -156,7 +155,14 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     setOrDelete("from", queryTime?.from ?? null);
     setOrDelete("to", queryTime?.to ?? null);
     const query = params.toString();
-    window.history.pushState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    const url = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    // 날짜 이동만 히스토리에 남긴다 — 칩 토글마다 push하면 뒤로 가기가 필터 되감기가 된다.
+    if (lastPushedDate.current !== selectedDate) {
+      window.history.pushState(null, "", url);
+      lastPushedDate.current = selectedDate;
+    } else {
+      window.history.replaceState(null, "", url);
+    }
   }, [initialized, selectedDate, directTheaterId, directTheaterIds, excludedTheaters, excludedChains, excludedMovies, goodieOnly, afterNow, queryMovie, queryLocation, queryTime]);
 
   useEffect(() => {
@@ -197,7 +203,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
       .finally(() => setLoading(false));
   }, [selectedDate, initialized, retryTick]);
 
-  const isToday = selectedDate === todayStr();
+  const isToday = selectedDate === localDateString();
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -274,13 +280,21 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     if (parsed.movieText) setQueryMovie(parsed.movieText);
   }, [data]);
 
+  // 하단 내비·홈 검색으로 넘어온 한 줄 원문은 극장 목록이 실린 데이터 도착 후 파싱한다.
+  // (기존에는 원문이 통째로 영화 제목이 돼 "라이카 저녁" 같은 입력이 0건이 됐다)
+  useEffect(() => {
+    if (!data || !pendingRawQuery) return;
+    handleQuerySubmit(pendingRawQuery);
+    setPendingRawQuery(null);
+  }, [data, pendingRawQuery, handleQuerySubmit]);
+
   const handleRemoveQueryChip = useCallback((key: string) => {
     if (key === "movie") setQueryMovie(null);
     else if (key === "location") setQueryLocation(null);
     else if (key === "time") setQueryTime(null);
     else if (key === "date") {
       setQueryDateLabel(null);
-      setSelectedDate(todayStr());
+      setSelectedDate(localDateString());
     }
   }, []);
 
@@ -290,7 +304,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
     setQueryTime(null);
     if (queryDateLabel) {
       setQueryDateLabel(null);
-      setSelectedDate(todayStr());
+      setSelectedDate(localDateString());
     }
   }, [queryDateLabel]);
 
@@ -335,10 +349,10 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
 
   const queryChips: QueryChip[] = useMemo(() => {
     const chips: QueryChip[] = [];
-    if (queryMovie) chips.push({ key: "movie", icon: "🎬", label: queryMovie });
-    if (queryLocation) chips.push({ key: "location", icon: "📍", label: queryLocation });
-    if (queryTime) chips.push({ key: "time", icon: "🕐", label: queryTime.label });
-    if (queryDateLabel) chips.push({ key: "date", icon: "📅", label: queryDateLabel });
+    if (queryMovie) chips.push({ key: "movie", label: queryMovie });
+    if (queryLocation) chips.push({ key: "location", label: queryLocation });
+    if (queryTime) chips.push({ key: "time", label: queryTime.label });
+    if (queryDateLabel) chips.push({ key: "date", label: queryDateLabel });
     return chips;
   }, [queryMovie, queryLocation, queryTime, queryDateLabel]);
 
@@ -442,9 +456,10 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
           />
         }
         coverage={data?.coverage ?? { label: "로딩 중…", theaterCount: 0 }}
-        updatedAt={data?.updatedAt ?? new Date().toISOString()}
-        goodsUpdatedAt={data?.goodsUpdatedAt ?? new Date().toISOString()}
+        updatedAt={data?.updatedAt ?? null}
+        goodsUpdatedAt={data?.goodsUpdatedAt ?? null}
         goodsUpdatedBySource={data?.goodsUpdatedBySource}
+        loading={!data}
         view={view}
         onViewChange={handleViewChange}
         selectedDate={selectedDate}
@@ -473,7 +488,9 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
       />
 
       {loading ? (
-        <div className="py-20 text-center text-sm text-ink-3">불러오는 중…</div>
+        <div className="space-y-3 px-4 py-5" role="status" aria-label="시간표 불러오는 중">
+          {[0, 1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-2xl bg-line-soft" />)}
+        </div>
       ) : loadError ? (
         <div className="py-20 text-center text-sm text-ink-3">
           데이터를 불러오지 못했어요 (일시적인 문제일 수 있어요)
@@ -482,7 +499,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
             onClick={() => setRetryTick((t) => t + 1)}
             className="mt-3 rounded-full border border-line bg-panel px-4 py-1.5 text-xs font-semibold text-ink-2 hover:border-app hover:text-app transition-colors"
           >
-            ↻ 다시 시도
+            <RefreshIcon size={12} /> 다시 시도
           </button>
         </div>
       ) : filtered.length === 0 ? (
@@ -506,7 +523,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
                 onClick={() => setGoodieOnly(false)}
                 className="mt-3 rounded-full border border-line bg-panel px-3 py-1 text-xs font-semibold text-ink-2 hover:border-goodie hover:text-goodie transition-colors"
               >
-                🎁 특전만 해제
+                <GiftIcon size={12} /> 특전만 해제
               </button>
             </>
           ) : afterNow && isToday ? (

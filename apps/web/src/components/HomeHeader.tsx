@@ -1,32 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Coverage, Chain } from "@mock/types";
+import { localDateString, type DateCoverage } from "@/lib/dates";
+import DateStrip from "@/components/DateStrip";
+import { GiftIcon, RefreshIcon, SlidersIcon, ClockIcon, FilmIcon, HomeIcon, CheckIcon, XIcon } from "@/components/icons";
 
-const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
-
-// DB에 존재하는 마지막 상영일(coverage.maxDate)까지 날짜 칩을 그린다 — 하드코딩 금지.
-// 폴백 8일(로딩 중·값 없음), 상한 21일(연도 오파싱 등 이상값 방어). 스트립은 가로 스크롤.
-function buildDates(maxDate?: string | null) {
-  const today = new Date();
-  let count = 8;
-  if (maxDate && /^\d{4}-\d{2}-\d{2}$/.test(maxDate)) {
-    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const diff = Math.round((new Date(maxDate + "T00:00:00").getTime() - todayMidnight.getTime()) / 86_400_000) + 1;
-    count = Math.min(Math.max(diff, 1), 21);
-  }
-  return Array.from({ length: count }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    const dayName = DAY_NAMES[d.getDay()];
-    const label = i === 0 ? `오늘 ${dayName}` : dayName;
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return { label, day: String(d.getDate()), dateStr: `${yyyy}-${mm}-${dd}` };
-  });
-}
+export type { DateCoverage } from "@/lib/dates";
 
 const CHAINS: { key: Chain; label: string; color: string }[] = [
   { key: "CGV", label: "CGV", color: "var(--color-cgv)" },
@@ -54,13 +35,6 @@ interface MovieMini {
   posterUrl: string | null;
 }
 
-export interface DateCoverage {
-  date: string;
-  screeningCount: number;
-  theaterCount: number;
-  indieTheaterCount: number;
-}
-
 interface CoverageWithTheaters extends Coverage {
   theaters?: TheaterInfo[];
   /** DB에 존재하는 마지막 상영일 (YYYY-MM-DD) — 날짜 스트립 범위 */
@@ -72,8 +46,11 @@ interface CoverageWithTheaters extends Coverage {
 interface Props {
   queryBar?: React.ReactNode;
   coverage: CoverageWithTheaters;
-  updatedAt: string;
-  goodsUpdatedAt: string;
+  /** null = 아직 로딩 전 — 시각을 지어내지 않고 플레이스홀더를 보여준다 */
+  updatedAt: string | null;
+  goodsUpdatedAt: string | null;
+  /** 데이터 도착 전 여부 — 날짜 칩이 "일정 없음"으로 오인되지 않게 */
+  loading?: boolean;
   goodsUpdatedBySource?: Partial<Record<Chain, string>>;
   view: "movie" | "time";
   onViewChange: (v: "movie" | "time") => void;
@@ -111,7 +88,7 @@ const CHAIN_COLORS: Record<string, string> = {
 
 export default function HomeHeader({
   queryBar,
-  coverage, updatedAt, goodsUpdatedAt, goodsUpdatedBySource, view, onViewChange, selectedDate, onDateChange,
+  coverage, updatedAt, goodsUpdatedAt, goodsUpdatedBySource, loading = false, view, onViewChange, selectedDate, onDateChange,
   afterNow, onAfterNowChange, goodieOnly, onGoodieOnlyChange, isToday,
   excludedTheaters, onToggleTheater, onToggleArea,
   excludedChains, onToggleChain,
@@ -123,8 +100,7 @@ export default function HomeHeader({
   const [showTheaters, setShowTheaters] = useState(initialShowTheaters);
   const [showMovies, setShowMovies] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const updated = new Date(updatedAt);
-  const goodsUpdated = new Date(goodsUpdatedAt);
+  const mobileSheetRef = useRef<HTMLElement | null>(null);
   const goodsSourceLabels: Record<Chain, string> = { CGV: "CGV", LOTTE: "롯데", MEGA: "메가", INDIE: "독립" };
   const goodsSourceSummary = CHAINS
     .filter(({ key }) => goodsUpdatedBySource?.[key])
@@ -139,17 +115,22 @@ export default function HomeHeader({
   function hhmm(d: Date) {
     return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
   }
+  /** 갱신 시각 표시 — 로딩 전(null)엔 시각을 지어내지 않는다 */
+  function freshness(iso: string | null) {
+    if (!iso) return "· · ·";
+    const d = new Date(iso);
+    return `${hhmm(d)} · ${ago(d)}`;
+  }
 
-  const dates = buildDates(coverage.maxDate);
   const coverageByDate = new Map((coverage.dateCoverage ?? []).map((item) => [item.date, item]));
   const selectedCoverage = coverageByDate.get(selectedDate);
-  const todayDate = dates[0]?.dateStr;
+  const todayDate = localDateString();
   // 당일 휴관은 정상일 수 있으므로 경고하지 않는다. 미래 날짜가 전체 카탈로그의
   // 70% 미만일 때만 아직 일부 극장 일정만 열린 것으로 안내한다.
   const partialThreshold = Math.ceil(coverage.theaterCount * 0.7);
   const isPartialCoverage = Boolean(
     selectedCoverage &&
-    selectedDate > (todayDate ?? selectedDate) &&
+    selectedDate > todayDate &&
     selectedCoverage.theaterCount < partialThreshold
   );
 
@@ -172,6 +153,8 @@ export default function HomeHeader({
     if (!showMobileFilters) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // 시트가 열리면 포커스를 시트로 옮긴다 — 스크린리더가 뒤 컨텐츠로 새지 않게
+    mobileSheetRef.current?.focus();
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") setShowMobileFilters(false);
     };
@@ -201,9 +184,10 @@ export default function HomeHeader({
                 setShowTheaters((value) => !value);
               }
             }}
+            aria-expanded={showTheaters}
             className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-2 hover:text-app transition-colors"
           >
-            <span className="text-app">◉</span>
+            <span className="inline-block h-[7px] w-[7px] flex-none rounded-full bg-app ring-[3px] ring-app/20" aria-hidden="true" />
             {coverage.label} · {activeCount}개 지점
             <span className={`text-[10px] transition-transform ${showTheaters ? "rotate-180" : ""}`}>▼</span>
           </button>
@@ -213,10 +197,10 @@ export default function HomeHeader({
           disabled={refreshing}
           className="max-w-[48%] flex-none text-right text-[10.5px] leading-snug text-ink-3 hover:text-app transition-colors disabled:opacity-50"
         >
-          <span className={refreshing ? "inline-block animate-spin" : ""}>↻</span>
-          {" "}상영 {hhmm(updated)} · {ago(updated)}
+          <RefreshIcon size={10} className={refreshing ? "animate-spin" : ""} />
+          {" "}상영 {freshness(updatedAt)}
           <br />
-          🎁 {goodsSourceSummary || `굿즈 ${hhmm(goodsUpdated)} · ${ago(goodsUpdated)}`}
+          <GiftIcon size={10} /> {goodsSourceSummary || `굿즈 ${freshness(goodsUpdatedAt)}`}
         </button>
       </div>
 
@@ -320,10 +304,10 @@ export default function HomeHeader({
                           }`}
                         />
                       ) : (
-                        <div className={`flex h-[72px] w-[50px] items-center justify-center rounded-lg bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_6px,#eef1f5_6px,#eef1f5_12px)] text-lg text-[#aab1bb] shadow-sm transition-all ${
+                        <div className={`flex h-[72px] w-[50px] items-center justify-center rounded-lg bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_6px,#eef1f5_6px,#eef1f5_12px)] text-[#aab1bb] shadow-sm transition-all ${
                           active ? "ring-2 ring-app" : "opacity-60"
                         }`}>
-                          🎞️
+                          <FilmIcon size={16} />
                         </div>
                       )}
                       {active ? (
@@ -350,32 +334,13 @@ export default function HomeHeader({
       )}
 
       {/* 날짜 스트립 */}
-      <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5">
-        {dates.map((d) => {
-          const active = d.dateStr === selectedDate;
-          const dateStatus = coverageByDate.get(d.dateStr);
-          return (
-            <button
-              key={d.dateStr}
-              onClick={() => onDateChange(d.dateStr)}
-              aria-current={active ? "date" : undefined}
-              className={`flex-none rounded-xl border px-2.5 py-1.5 text-center ${
-                active
-                  ? "border-ink bg-ink text-white"
-                  : "border-line bg-panel text-ink"
-              }`}
-            >
-              <small className={`block text-[10px] ${active ? "text-white/70" : "text-ink-3"}`}>
-                {d.label}
-              </small>
-              <b className="block text-[15px] leading-tight">{active && <span className="mr-0.5" aria-hidden="true">✓</span>}{d.day}</b>
-              <span className={`mt-0.5 block text-[9px] tabular-nums ${active ? "text-white/75" : "text-ink-3"}`}>
-                {dateStatus ? `${dateStatus.theaterCount}개 극장` : "일정 없음"}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <DateStrip
+        selectedDate={selectedDate}
+        onChange={onDateChange}
+        maxDate={coverage.maxDate}
+        dateCoverage={coverage.dateCoverage}
+        loading={loading}
+      />
 
       {isPartialCoverage && selectedCoverage && (
         <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
@@ -389,37 +354,37 @@ export default function HomeHeader({
           <button
             onClick={() => onViewChange("movie")}
             aria-pressed={view === "movie"}
-            className={`rounded-lg px-3 py-1 text-[12.5px] font-bold ${
+            className={`inline-flex items-center gap-1 rounded-lg px-3 py-1 text-[12.5px] font-bold ${
               view === "movie"
                 ? "bg-white text-ink shadow-sm"
                 : "text-ink-2"
             }`}
           >
-            {view === "movie" && <span aria-hidden="true">✓ </span>}영화별
+            <CheckIcon size={11} className={view === "movie" ? "text-app" : "opacity-0"} />영화별
           </button>
           <button
             onClick={() => onViewChange("time")}
             aria-pressed={view === "time"}
-            className={`rounded-lg px-3 py-1 text-[12.5px] font-bold ${
+            className={`inline-flex items-center gap-1 rounded-lg px-3 py-1 text-[12.5px] font-bold ${
               view === "time"
                 ? "bg-white text-ink shadow-sm"
                 : "text-ink-2"
             }`}
           >
-            {view === "time" && <span aria-hidden="true">✓ </span>}시간순
+            <CheckIcon size={11} className={view === "time" ? "text-app" : "opacity-0"} />시간순
           </button>
         </div>
         <Link
           href={`/events?date=${selectedDate}`}
           className="inline-flex items-center gap-1 rounded-full border border-goodie-line bg-goodie-tint/60 px-2.5 py-1 text-xs font-semibold text-goodie transition-colors hover:bg-goodie-tint"
         >
-          🎁 특전 피드
+          <GiftIcon size={12} /> 특전 피드
         </Link>
         <button
           onClick={() => setShowMobileFilters(true)}
           className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-line bg-panel px-3 py-1 text-xs font-bold text-ink-2 sm:hidden"
         >
-          ⚙ 필터{filterCount > 0 && <span className="rounded-full bg-app px-1.5 text-[9px] text-white">{filterCount}</span>}
+          <SlidersIcon size={12} /> 필터{filterCount > 0 && <span className="rounded-full bg-app px-1.5 text-[9px] text-white">{filterCount}</span>}
         </button>
         {view !== "time" && (
           <button
@@ -431,7 +396,7 @@ export default function HomeHeader({
                 : "border-line bg-panel text-ink-3"
             }`}
           >
-            {afterNow && isToday ? "✓ " : "🕒 "}지금 이후
+            {afterNow && isToday ? <CheckIcon size={12} /> : <ClockIcon size={12} />}지금 이후
           </button>
         )}
       </div>
@@ -455,30 +420,30 @@ export default function HomeHeader({
                 className="h-[7px] w-[7px] rounded-full"
                 style={{ background: active ? c.color : "#ccc" }}
               />
-              {active && <span aria-hidden="true">✓</span>}{c.label}
+              <CheckIcon size={11} className={active ? "" : "opacity-0"} />{c.label}
             </button>
           );
         })}
         <button
           onClick={() => onGoodieOnlyChange(!goodieOnly)}
           aria-pressed={goodieOnly}
-          className={`rounded-full border px-2.5 py-1 text-[12.5px] font-semibold transition-colors ${
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12.5px] font-semibold transition-colors ${
             goodieOnly
               ? "border-goodie bg-goodie-tint text-goodie"
               : "border-line bg-panel text-ink-2"
           }`}
         >
-          {goodieOnly ? "✓ " : "🎁 "}특전만
+          {goodieOnly ? <CheckIcon size={12} /> : <GiftIcon size={12} />}특전만
         </button>
         <button
           onClick={() => { setShowMovies((v) => !v); setShowTheaters(false); }}
-          className={`rounded-full border px-2.5 py-1 text-[12.5px] transition-colors ${
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12.5px] transition-colors ${
             showMovies || excludedMovies.size > 0
               ? "border-app bg-app-tint text-app font-semibold"
               : "border-line bg-panel text-ink-2"
           }`}
         >
-          🎬 영화 골라보기
+          <FilmIcon size={12} /> 영화 골라보기
           {excludedMovies.size > 0 && (
             <span className="ml-1 text-[10px]">−{excludedMovies.size}</span>
           )}
@@ -494,7 +459,7 @@ export default function HomeHeader({
               onClick={onResetTheaters}
               className="inline-flex items-center gap-1 rounded-full border border-line bg-panel px-2 py-0.5 text-ink-2 hover:border-soldout hover:text-soldout transition-colors"
             >
-              극장별 <span className="text-[10px]">✕</span>
+              극장별 <XIcon size={10} />
             </button>
           )}
           {hasMovieFilter && (
@@ -502,7 +467,7 @@ export default function HomeHeader({
               onClick={onResetMovies}
               className="inline-flex items-center gap-1 rounded-full border border-line bg-panel px-2 py-0.5 text-ink-2 hover:border-soldout hover:text-soldout transition-colors"
             >
-              영화별 <span className="text-[10px]">✕</span>
+              영화별 <XIcon size={10} />
             </button>
           )}
           {hasTheaterFilter && hasMovieFilter && (
@@ -524,10 +489,12 @@ export default function HomeHeader({
             aria-label="필터 닫기"
           />
           <section
+            ref={mobileSheetRef}
             role="dialog"
             aria-modal="true"
             aria-label="상세 필터"
-            className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-3xl bg-white px-4 pb-7 pt-3 shadow-2xl"
+            tabIndex={-1}
+            className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-3xl bg-white px-4 pb-7 pt-3 shadow-2xl outline-none"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" />
             <div className="flex items-center gap-2">
@@ -546,9 +513,9 @@ export default function HomeHeader({
                       key={chain.key}
                       onClick={() => onToggleChain(chain.key)}
                       aria-pressed={active}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-app bg-app-tint text-app" : "border-line bg-ground text-ink-3 opacity-55"}`}
+                      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-app bg-app-tint text-app" : "border-line bg-ground text-ink-3 opacity-55"}`}
                     >
-                      {active && <span aria-hidden="true">✓ </span>}{chain.label}
+                      <CheckIcon size={11} className={active ? "" : "opacity-0"} />{chain.label}
                     </button>
                   );
                 })}
@@ -559,32 +526,32 @@ export default function HomeHeader({
               <button
                 onClick={() => onGoodieOnlyChange(!goodieOnly)}
                 aria-pressed={goodieOnly}
-                className={`rounded-full border px-3 py-1.5 text-xs font-bold ${goodieOnly ? "border-goodie bg-goodie-tint text-goodie" : "border-line bg-panel text-ink-2"}`}
+                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold ${goodieOnly ? "border-goodie bg-goodie-tint text-goodie" : "border-line bg-panel text-ink-2"}`}
               >
-                {goodieOnly ? "✓ " : "🎁 "}특전만
+                {goodieOnly ? <CheckIcon size={12} /> : <GiftIcon size={12} />}특전만
               </button>
               {view !== "time" && isToday && (
                 <button
                   onClick={() => onAfterNowChange(!afterNow)}
                   aria-pressed={afterNow}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-bold ${afterNow ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-2"}`}
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold ${afterNow ? "border-app bg-app-tint text-app" : "border-line bg-panel text-ink-2"}`}
                 >
-                  {afterNow ? "✓ " : "🕒 "}지금 이후
+                  {afterNow ? <CheckIcon size={12} /> : <ClockIcon size={12} />}지금 이후
                 </button>
               )}
               <button
                 onClick={() => { setShowTheaters((value) => !value); setShowMovies(false); }}
                 aria-expanded={showTheaters}
-                className={`rounded-full border px-3 py-1.5 text-xs font-bold ${showTheaters || hasTheaterFilter ? "border-app bg-app-tint text-app" : "border-line"}`}
+                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold ${showTheaters || hasTheaterFilter ? "border-app bg-app-tint text-app" : "border-line"}`}
               >
-                {showTheaters ? "✓ " : "🏠 "}극장 선택
+                {showTheaters ? <CheckIcon size={12} /> : <HomeIcon size={12} />}극장 선택
               </button>
               <button
                 onClick={() => { setShowMovies((value) => !value); setShowTheaters(false); }}
                 aria-expanded={showMovies}
-                className={`rounded-full border px-3 py-1.5 text-xs font-bold ${showMovies || hasMovieFilter ? "border-app bg-app-tint text-app" : "border-line"}`}
+                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold ${showMovies || hasMovieFilter ? "border-app bg-app-tint text-app" : "border-line"}`}
               >
-                {showMovies ? "✓ " : "🎬 "}영화 선택
+                {showMovies ? <CheckIcon size={12} /> : <FilmIcon size={12} />}영화 선택
               </button>
             </div>
 
@@ -630,7 +597,7 @@ export default function HomeHeader({
                       <button key={movie.id} onClick={() => onToggleMovie(movie.id)} aria-pressed={active} className="w-[58px] flex-none">
                         {movie.posterUrl ? (
                           <img src={movie.posterUrl.replace("/w500/", "/w200/")} alt={`${movie.title} 포스터`} className={`h-[78px] w-[54px] rounded-lg object-cover ${active ? "ring-2 ring-app" : "opacity-45"}`} />
-                        ) : <div className={`flex h-[78px] w-[54px] items-center justify-center rounded-lg bg-line-soft ${active ? "ring-2 ring-app" : "opacity-45"}`}>🎞️</div>}
+                        ) : <div className={`flex h-[78px] w-[54px] items-center justify-center rounded-lg bg-line-soft text-[#aab1bb] ${active ? "ring-2 ring-app" : "opacity-45"}`}><FilmIcon size={16} /></div>}
                         <span className="mt-1 block truncate text-[9.5px]">{active && <span aria-hidden="true">✓ </span>}{movie.title}</span>
                       </button>
                     );

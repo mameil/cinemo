@@ -1,12 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { SearchIcon, XIcon, FilmIcon, ClockIcon, CalendarIcon, MapPinIcon } from "@/components/icons";
 
 export interface QueryChip {
-  key: string; // movie | location | time | date
-  icon: string;
+  key: "movie" | "location" | "time" | "date";
   label: string;
 }
+
+const CHIP_ICON = {
+  movie: FilmIcon,
+  location: MapPinIcon,
+  time: ClockIcon,
+  date: CalendarIcon,
+} as const;
 
 interface Props {
   chips: QueryChip[];
@@ -36,7 +43,7 @@ export default function QueryBar({ chips, hint, onSubmit, onRemoveChip, onClearA
         }}
         className="flex items-center gap-2 rounded-xl border border-line bg-ground px-3 py-2 focus-within:border-app transition-colors"
       >
-        <span className="text-sm text-ink-3">🔍</span>
+        <SearchIcon size={15} className="text-ink-3" />
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -52,15 +59,18 @@ export default function QueryBar({ chips, hint, onSubmit, onRemoveChip, onClearA
 
       {(chips.length > 0 || hint) && (
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          {chips.map((c) => (
-            <button
-              key={c.key}
-              onClick={() => onRemoveChip(c.key)}
-              className="inline-flex items-center gap-1 rounded-full border border-app bg-app-tint px-2 py-0.5 text-[11.5px] font-semibold text-app hover:opacity-70 transition-opacity"
-            >
-              {c.icon} {c.label} <span className="text-[10px]">✕</span>
-            </button>
-          ))}
+          {chips.map((c) => {
+            const ChipIcon = CHIP_ICON[c.key];
+            return (
+              <button
+                key={c.key}
+                onClick={() => onRemoveChip(c.key)}
+                className="inline-flex items-center gap-1 rounded-full border border-app bg-app-tint px-2 py-0.5 text-[11.5px] font-semibold text-app hover:opacity-70 transition-opacity"
+              >
+                <ChipIcon size={11} /> {c.label} <XIcon size={10} />
+              </button>
+            );
+          })}
           {chips.length > 1 && (
             <button
               onClick={onClearAll}

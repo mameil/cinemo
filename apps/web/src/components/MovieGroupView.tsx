@@ -7,6 +7,7 @@ import { requiredFormat, formatSatisfies } from "@/lib/event-rules";
 import EventPeek, { type PeekTarget } from "@/components/EventPeek";
 import Link from "next/link";
 import { parseProgramTitle } from "@/lib/program-title";
+import { GiftIcon, FilmIcon } from "@/components/icons";
 
 interface MovieGroup {
   movie: MovieMini;
@@ -164,8 +165,8 @@ function MovieGroupCard({
               className="h-[80px] w-[55px] rounded-[9px] object-cover bg-[#dfe4ea]"
             />
           ) : (
-            <div className="flex h-[80px] w-[55px] items-center justify-center rounded-[9px] bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_6px,#eef1f5_6px,#eef1f5_12px)] text-xl text-[#aab1bb]">
-              🎞️
+            <div className="flex h-[80px] w-[55px] items-center justify-center rounded-[9px] bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_6px,#eef1f5_6px,#eef1f5_12px)] text-[#aab1bb]">
+              <FilmIcon size={18} />
             </div>
           )}
         </Link>
@@ -205,7 +206,7 @@ function MovieGroupCard({
               }
               className="mt-1 text-[11.5px] text-goodie font-semibold hover:underline"
             >
-              🎁 특전 {g.eventTypes.length}종 <span className="text-[10px] font-normal text-ink-3">눌러서 보기</span>
+              <GiftIcon size={11} /> 특전 {g.eventTypes.length}종 <span className="text-[10px] font-normal text-ink-3">눌러서 보기</span>
             </button>
           )}
         </div>
@@ -265,7 +266,7 @@ function MovieGroupCard({
                     onClick={() => peekChain(null, undefined, undefined, new Set(theaterEventTypes))}
                     className={`rounded-full border px-1.5 py-px text-[9.5px] font-bold transition-colors cursor-pointer whitespace-nowrap ${GOODIE_BADGE_CLASS}`}
                   >
-                    🎁 {theaterEventTypes.length >= 2 ? `${theaterEventTypes.length}종 · ` : ""}
+                    <GiftIcon size={10} /> {theaterEventTypes.length >= 2 ? `${theaterEventTypes.length}종 · ` : ""}
                     {typeLabels.slice(0, 2).join("·")}
                     {typeLabels.length > 2 && " 외"}
                   </button>
@@ -313,7 +314,7 @@ function MovieGroupCard({
                           className="ml-1 font-semibold text-goodie hover:underline cursor-pointer"
                           title="이 상영관에서 받는 특전 도안 보기"
                         >
-                          🎁{" "}
+                          <GiftIcon size={10} />{" "}
                           {sgItems2.slice(0, 2).map((it, i) => (
                             <span key={it.name}>
                               {i > 0 && " · "}

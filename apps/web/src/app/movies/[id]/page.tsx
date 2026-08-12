@@ -6,6 +6,7 @@ import Link from "next/link";
 import { parseProgramTitle } from "@/lib/program-title";
 import { CHAIN_COLOR, GOODIE_BADGE_CLASS, GOODIE_CHIP_CLASS, cleanGoodieName, shortScreenName } from "@/lib/utils";
 import { requiredFormat, formatSatisfies } from "@/lib/event-rules";
+import { GiftIcon, CalendarIcon, ImageIcon, RefreshIcon } from "@/components/icons";
 
 /** 특전 엔트리 — 종류 + 요구 포맷 + 굿즈 실명 + 재고 (4DX 포스터는 4DX 상영에만) */
 interface GoodieEntry {
@@ -147,7 +148,7 @@ function EventCard({ event, dimmed }: { event: EventItem; dimmed?: boolean }) {
             className={`rounded-[5px] border px-1.5 py-0.5 text-[10.5px] font-bold transition-opacity ${GOODIE_BADGE_CLASS} ${showImage ? "opacity-70" : ""}`}
           >
             {event.goodies[0].type === "기타" ? "현장이벤트" : event.goodies[0].type}
-            <span className="ml-1 font-normal">{showImage ? "▲" : "🖼️ 보기"}</span>
+            <span className="ml-1 font-normal">{showImage ? "▲" : <><ImageIcon size={11} /> 보기</>}</span>
           </button>
         )}
       </div>
@@ -178,7 +179,7 @@ function EventCard({ event, dimmed }: { event: EventItem; dimmed?: boolean }) {
             </>
           ) : (
             <div className="flex items-center justify-center gap-1.5 bg-ground py-5 text-[11.5px] text-ink-3">
-              🖼️ {chainLabel} 특전 이미지 미제공
+              <ImageIcon size={13} /> {chainLabel} 특전 이미지 미제공
             </div>
           )}
         </div>
@@ -289,8 +290,8 @@ function ScreeningSection({
               />
               {items[0].branchName}
               {goodieCount > 0 && (
-                <span className={`rounded-full border px-1.5 py-px text-[9.5px] font-bold ${GOODIE_BADGE_CLASS}`}>
-                  🎁 {goodieCount >= 2 ? `${goodieCount}종 · ` : ""}
+                <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[9.5px] font-bold ${GOODIE_BADGE_CLASS}`}>
+                  <GiftIcon size={10} /> {goodieCount >= 2 ? `${goodieCount}종 · ` : ""}
                   {typeLabels.slice(0, 2).join("·")}
                   {typeLabels.length > 2 && " 외"}
                 </span>
@@ -316,7 +317,7 @@ function ScreeningSection({
                   {label}
                   {sgItems2.length > 0 && (
                     <span className="ml-1 font-semibold text-goodie">
-                      🎁{" "}
+                      <GiftIcon size={10} />{" "}
                       {sgItems2.slice(0, 2).map((it, i) => (
                         <span key={it.name}>
                           {i > 0 && " · "}
@@ -477,7 +478,7 @@ export default function MovieDetailPage() {
               onClick={() => setRetryTick((t) => t + 1)}
               className="mt-3 rounded-full border border-line bg-panel px-4 py-1.5 text-xs font-semibold text-ink-2 hover:border-app hover:text-app transition-colors"
             >
-              ↻ 다시 시도
+              <RefreshIcon size={12} /> 다시 시도
             </button>
           </div>
         )}
@@ -495,8 +496,20 @@ export default function MovieDetailPage() {
         <b className="truncate text-[15px]">{program.title}</b>
       </div>
 
-      {/* 히어로 */}
-      <div className="flex gap-3.5 px-4 pb-4 pt-4.5">
+      {/* 히어로 — 포스터를 은은하게 깐 앰비언트 배경 */}
+      <div className="relative overflow-hidden">
+        {detail.posterUrl && (
+          <>
+            <img
+              src={detail.posterUrl.replace("/w500/", "/w200/")}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-white/55 to-white" />
+          </>
+        )}
+      <div className="relative flex gap-3.5 px-4 pb-4 pt-4.5">
         {detail.posterUrl ? (
           <img
             src={detail.posterUrl}
@@ -521,11 +534,12 @@ export default function MovieDetailPage() {
             <p className="text-[13px] text-ink-2">개봉 {detail.releaseDate.replace(/-/g, ".")}</p>
           )}
           {totalActive > 0 && (
-            <p className="mt-1.5 text-[13px] font-semibold text-goodie">
-              🎁 특전 {totalActive}건{active.length > 0 ? ` (진행중 ${active.length})` : ""}
+            <p className="mt-1.5 flex items-center gap-1 text-[13px] font-semibold text-goodie">
+              <GiftIcon size={13} /> 특전 {totalActive}건{active.length > 0 ? ` (진행중 ${active.length})` : ""}
             </p>
           )}
         </div>
+      </div>
       </div>
 
       {/* 특전 섹션 — 활성 / 다음 / 지난 분류 */}
@@ -534,7 +548,7 @@ export default function MovieDetailPage() {
           {active.length > 0 && (
             <>
               <div className="mb-3">
-                <h4 className="text-[15px] font-bold tracking-tight">🎁 지금 받을 수 있어요</h4>
+                <h4 className="flex items-center gap-1.5 text-[15px] font-bold tracking-tight"><GiftIcon size={15} className="text-goodie" /> 지금 받을 수 있어요</h4>
                 <p className="mt-0.5 text-xs text-ink-3">오늘 이 영화를 보면 받는 특전</p>
               </div>
               {active.map((e) => (
@@ -546,7 +560,7 @@ export default function MovieDetailPage() {
           {upcoming.length > 0 && (
             <>
               <div className={`mb-3 ${active.length > 0 ? "mt-5 border-t border-line-soft pt-4" : ""}`}>
-                <h4 className="text-[14px] font-bold tracking-tight text-ink-2">📅 다음 특전</h4>
+                <h4 className="flex items-center gap-1.5 text-[14px] font-bold tracking-tight text-ink-2"><CalendarIcon size={14} /> 다음 특전</h4>
               </div>
               {upcoming.map((e) => (
                 <EventCard key={e.id} event={e} dimmed />

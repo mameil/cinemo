@@ -4,8 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ScreeningCard } from "@mock/types";
-import type { DateCoverage, TheaterInfo } from "@/components/HomeHeader";
+import type { TheaterInfo } from "@/components/HomeHeader";
+import { localDateString, nowHHMM, type DateCoverage } from "@/lib/dates";
+import DateStrip from "@/components/DateStrip";
 import AppNav from "@/components/AppNav";
+import { SearchIcon, XIcon, RefreshIcon, StarIcon } from "@/components/icons";
 
 interface TheaterResponse {
   coverage: {
@@ -17,7 +20,6 @@ interface TheaterResponse {
   screenings: ScreeningCard[];
 }
 
-const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 const FAVORITE_THEATERS_KEY = "cinemo-favorite-theaters";
 const STALE_AFTER_MS = 36 * 60 * 60 * 1_000;
 
@@ -25,33 +27,6 @@ type TheaterCard = TheaterInfo & {
   items: ScreeningCard[];
   next: string | null;
 };
-
-function dateString(date = new Date()) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function timeString() {
-  const now = new Date();
-  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-}
-
-function datesUntil(maxDate?: string | null) {
-  const today = new Date();
-  const todayText = dateString(today);
-  const last = maxDate && maxDate >= todayText ? new Date(`${maxDate}T00:00:00`) : null;
-  const count = last
-    ? Math.min(Math.max(Math.floor((last.getTime() - new Date(`${todayText}T00:00:00`).getTime()) / 86_400_000) + 1, 1), 21)
-    : 8;
-  return Array.from({ length: count }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() + index);
-    return {
-      date: dateString(date),
-      day: date.getDate(),
-      label: index === 0 ? "오늘" : index === 1 ? "내일" : DAY_NAMES[date.getDay()],
-    };
-  });
-}
 
 function updateLabel(updatedAt?: string | null) {
   if (!updatedAt) return "갱신 기록 없음";
@@ -135,9 +110,9 @@ function TheaterRow({
         onClick={() => onToggleFavorite(theater.id)}
         aria-label={`${theater.branchName} ${favorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}`}
         aria-pressed={favorite}
-        className={`mr-2 flex h-10 w-10 flex-none items-center justify-center rounded-full text-lg ${favorite ? "text-app" : "text-ink-3 hover:bg-line-soft"}`}
+        className={`mr-2 flex h-10 w-10 flex-none items-center justify-center rounded-full ${favorite ? "text-app" : "text-ink-3 hover:bg-line-soft"}`}
       >
-        {favorite ? "★" : "☆"}
+        <StarIcon size={16} fill={favorite ? "currentColor" : "none"} />
       </button>}
     </div>
   );
@@ -146,7 +121,7 @@ function TheaterRow({
 export default function TheatersPage() {
   const router = useRouter();
   const [initialized, setInitialized] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(dateString());
+  const [selectedDate, setSelectedDate] = useState(localDateString());
   const [data, setData] = useState<TheaterResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -158,7 +133,7 @@ export default function TheatersPage() {
 
   useEffect(() => {
     const requestedDate = new URLSearchParams(window.location.search).get("date");
-    if (requestedDate && requestedDate >= dateString()) setSelectedDate(requestedDate);
+    if (requestedDate && requestedDate >= localDateString()) setSelectedDate(requestedDate);
     try {
       const stored = JSON.parse(localStorage.getItem(FAVORITE_THEATERS_KEY) ?? "[]");
       if (Array.isArray(stored)) {
@@ -184,9 +159,7 @@ export default function TheatersPage() {
       .finally(() => setLoading(false));
   }, [initialized, selectedDate, retryTick]);
 
-  const dates = datesUntil(data?.coverage.maxDate);
-  const coverageByDate = new Map((data?.coverage.dateCoverage ?? []).map((item) => [item.date, item]));
-  const isToday = selectedDate === dateString();
+  const isToday = selectedDate === localDateString();
 
   const theaterCards = useMemo(() => {
     if (!data) return [];
@@ -196,7 +169,7 @@ export default function TheatersPage() {
       items.push(screening);
       screeningsByTheater.set(screening.theater.id, items);
     }
-    const cutoff = isToday ? timeString() : "00:00";
+    const cutoff = isToday ? nowHHMM() : "00:00";
     return (data.coverage.theaters ?? []).map((theater) => {
       const items = screeningsByTheater.get(theater.id) ?? [];
       const next = items.map((item) => item.startTime).filter((time) => time >= cutoff).sort()[0] ?? null;
@@ -285,7 +258,7 @@ export default function TheatersPage() {
         </div>
 
         <div className="mt-3 flex items-center gap-2 rounded-xl border border-line bg-ground px-3 py-2 focus-within:border-app">
-          <span aria-hidden="true">🔍</span>
+          <SearchIcon size={15} className="text-ink-3" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -293,27 +266,16 @@ export default function TheatersPage() {
             placeholder="필름포럼, 라이카, 영등포…"
             className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-ink-3"
           />
-          {query && <button onClick={() => setQuery("")} className="text-xs text-ink-3" aria-label="검색어 지우기">✕</button>}
+          {query && <button onClick={() => setQuery("")} className="text-ink-3" aria-label="검색어 지우기"><XIcon size={13} /></button>}
         </div>
 
-        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5">
-          {dates.map((item) => {
-            const active = item.date === selectedDate;
-            const coverage = coverageByDate.get(item.date);
-            return (
-              <button
-                key={item.date}
-                onClick={() => changeDate(item.date)}
-                aria-current={active ? "date" : undefined}
-                className={`flex-none rounded-xl border px-3 py-1.5 text-center ${active ? "border-ink bg-ink text-white" : "border-line bg-panel"}`}
-              >
-                <small className={`block text-[10px] ${active ? "text-white/70" : "text-ink-3"}`}>{item.label}</small>
-                <b className="block text-[15px] leading-tight">{active && <span className="mr-0.5" aria-hidden="true">✓</span>}{item.day}</b>
-                <span className={`text-[9px] ${active ? "text-white/75" : "text-ink-3"}`}>{coverage ? `${coverage.theaterCount}개` : "없음"}</span>
-              </button>
-            );
-          })}
-        </div>
+        <DateStrip
+          selectedDate={selectedDate}
+          onChange={changeDate}
+          maxDate={data?.coverage.maxDate}
+          dateCoverage={data?.coverage.dateCoverage}
+          loading={!data}
+        />
       </header>
 
       <div className="space-y-6 px-4 py-5">
@@ -330,7 +292,7 @@ export default function TheatersPage() {
               onClick={() => setRetryTick((tick) => tick + 1)}
               className="mt-3 rounded-full border border-line bg-panel px-4 py-1.5 text-xs font-semibold text-ink-2 hover:border-app hover:text-app"
             >
-              ↻ 다시 시도
+              <RefreshIcon size={12} /> 다시 시도
             </button>
           </div>
         ) : sections.length === 0 && favoriteCards.length === 0 ? (

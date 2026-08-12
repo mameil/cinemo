@@ -6,6 +6,7 @@ import AppNav from "@/components/AppNav";
 import type { Chain } from "@mock/types";
 import { CHAIN_COLOR, CHAIN_LABEL, GOODIE_BADGE_CLASS, cleanGoodieName } from "@/lib/utils";
 import EventPeek, { type PeekTarget } from "@/components/EventPeek";
+import { GiftIcon, FilmIcon, RefreshIcon } from "@/components/icons";
 
 interface FeedEvent {
   id: number;
@@ -201,7 +202,7 @@ export default function EventsFeedPage() {
       {/* 상단 네비 */}
       <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-white/95 px-3.5 py-2.5 backdrop-blur-sm">
         <Link href={navDate ? `/?date=${navDate}` : "/"} className="text-lg">←</Link>
-        <b className="text-[15px]">🎁 특전</b>
+        <b className="inline-flex items-center gap-1.5 text-[15px]"><GiftIcon size={14} className="text-goodie" /> 특전</b>
         <span className="text-[11px] text-ink-3">받을 수 있는 특전부터</span>
         {/* 카드/리스트 토글 */}
         <div className="ml-auto inline-flex rounded-[10px] bg-[#e7ebf1] p-0.5">
@@ -271,7 +272,7 @@ export default function EventsFeedPage() {
                 : "border-line bg-panel text-ink-2"
             }`}
           >
-            {c === "특전" ? "🎁 특전" : c}
+            {c === "특전" ? <><GiftIcon size={11} /> 특전</> : c}
           </button>
         ))}
       </div>
@@ -287,7 +288,7 @@ export default function EventsFeedPage() {
               className="inline-flex items-center gap-1 rounded-full border border-line bg-panel px-2 py-0.5 text-ink-2 line-through hover:border-app hover:text-app hover:no-underline transition-colors"
               title="다시 보기"
             >
-              {c.kind === "movie" ? "🎬 " : ""}{c.label} <span className="text-[9px] no-underline">↩</span>
+              {c.kind === "movie" && <FilmIcon size={10} />}{c.label} <span className="text-[9px] no-underline">↩</span>
             </button>
           ))}
           <button
@@ -317,7 +318,7 @@ export default function EventsFeedPage() {
             onClick={() => setRetryTick((t) => t + 1)}
             className="mt-3 rounded-full border border-line bg-panel px-4 py-1.5 text-xs font-semibold text-ink-2 hover:border-app hover:text-app transition-colors"
           >
-            ↻ 다시 시도
+            <RefreshIcon size={12} /> 다시 시도
           </button>
         </div>
       ) : filtered.length === 0 ? (
@@ -356,8 +357,8 @@ export default function EventsFeedPage() {
                     className="h-14 w-14 flex-none rounded-lg object-cover object-top bg-ground"
                   />
                 ) : (
-                  <div className="flex h-14 w-14 flex-none items-center justify-center rounded-lg bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_6px,#eef1f5_6px,#eef1f5_12px)] text-base">
-                    🎁
+                  <div className="flex h-14 w-14 flex-none items-center justify-center rounded-lg bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_6px,#eef1f5_6px,#eef1f5_12px)] text-[#aab1bb]">
+                    <GiftIcon size={16} />
                   </div>
                 )}
                 {/* 본문 */}
@@ -377,7 +378,7 @@ export default function EventsFeedPage() {
                   </div>
                   <p className="mt-0.5 truncate text-[10.5px] text-ink-3">
                     {e.types.map((t) => (t === "기타" ? "이벤트" : t)).join("·")}
-                    {e.movie && <> · 🎬 {e.movie.title}</>}
+                    {e.movie && <> · <FilmIcon size={10} /> {e.movie.title}</>}
                   </p>
                   <span className={`mt-1 inline-block rounded-full border px-1.5 py-px text-[9.5px] font-bold ${status.className}`}>{status.text}</span>
                 </div>
@@ -462,7 +463,7 @@ export default function EventsFeedPage() {
                       ))}
                     </div>
                     <p className="line-clamp-2 text-[12.5px] font-semibold leading-snug">{mainName}</p>
-                    {e.movie && <p className="mt-1 truncate text-[10.5px] font-semibold text-ink-2">🎬 {e.movie.title}</p>}
+                    {e.movie && <p className="mt-1 truncate text-[10.5px] font-semibold text-ink-2"><FilmIcon size={10} /> {e.movie.title}</p>}
                     <span className={`mt-1.5 inline-block rounded-full border px-1.5 py-0.5 text-[9.5px] font-bold ${status.className}`}>
                       {status.text}
                     </span>
@@ -493,7 +494,7 @@ export default function EventsFeedPage() {
                       href={`/movies/${e.movie.id}`}
                       className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-ink-2 hover:text-app transition-colors"
                     >
-                      🎬 <span className="truncate">{e.movie.title}</span>
+                      <FilmIcon size={11} /> <span className="truncate">{e.movie.title}</span>
                       <span className="ml-auto text-ink-3">→</span>
                     </Link>
                   ) : (
