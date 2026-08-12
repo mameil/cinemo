@@ -6,7 +6,7 @@ import { GOODIE_BADGE_CLASS } from "@/lib/utils";
 import { ImageIcon } from "@/components/icons";
 
 const CHAIN_LABEL: Record<string, string> = { CGV: "CGV", LOTTE: "롯데", MEGA: "메가", INDIE: "독립" };
-const CHAIN_CLASS: Record<string, string> = { CGV: "bg-cgv", LOTTE: "bg-lotte", MEGA: "bg-mega", INDIE: "bg-[#555]" };
+const CHAIN_CLASS: Record<string, string> = { CGV: "bg-cgv", LOTTE: "bg-lotte", MEGA: "bg-mega", INDIE: "bg-indie" };
 
 export interface PeekTarget {
   movieTitle: string;
@@ -135,12 +135,12 @@ export default function EventPeek({ target, onClose }: { target: PeekTarget; onC
                     지점 미확인
                   </span>
                 )}
-                <span className="ml-auto text-[10.5px] text-ink-3 tabular-nums">
+                <span className="ml-auto text-[11px] text-ink-3 tabular-nums">
                   {it.startDate.slice(5).replace("-", "/")}~{it.endDate.slice(5).replace("-", "/")}
                 </span>
               </div>
               <div className="flex items-start gap-2 px-3 pb-2">
-                <p className="min-w-0 flex-1 text-[12.5px] font-semibold leading-snug">{it.eventName}</p>
+                <p className="min-w-0 flex-1 text-[13px] font-semibold leading-snug">{it.eventName}</p>
                 {it.sourceUrl && (
                   <a
                     href={it.sourceUrl}
@@ -171,12 +171,12 @@ export default function EventPeek({ target, onClose }: { target: PeekTarget; onC
                     loading="lazy"
                     className="w-full bg-ground object-contain"
                   />
-                  <p className="border-t border-line-soft bg-ground px-3 py-1.5 text-[10.5px] text-ink-3">
+                  <p className="border-t border-line-soft bg-ground px-3 py-1.5 text-[11px] text-ink-3">
                     ⓘ 홍보 배너 이미지 — 실물 도안 미수집
                   </p>
                 </>
               ) : (
-                <div className="flex items-center justify-center gap-1.5 border-t border-line-soft bg-ground py-5 text-[11.5px] text-ink-3">
+                <div className="flex items-center justify-center gap-1.5 border-t border-line-soft bg-ground py-5 text-[12px] text-ink-3">
                   <ImageIcon size={13} /> {CHAIN_LABEL[it.chain] ?? it.chain} 특전 이미지 미제공
                 </div>
               )}

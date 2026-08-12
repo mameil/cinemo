@@ -26,11 +26,11 @@ export default function DateStrip({ selectedDate, onChange, maxDate, dateCoverag
             key={item.date}
             onClick={() => onChange(item.date)}
             aria-current={active ? "date" : undefined}
-            className={`flex-none rounded-xl border px-2.5 py-1.5 text-center ${active ? "border-ink bg-ink text-white" : "border-line bg-panel text-ink"}`}
+            className={`flex-none rounded-xl border px-2.5 py-1.5 text-center ${active ? "border-ink bg-ink text-ground" : "border-line bg-panel text-ink"}`}
           >
-            <small className={`block text-[10px] ${active ? "text-white/70" : "text-ink-3"}`}>{item.label}</small>
+            <small className={`block text-[10px] ${active ? "text-ground/70" : "text-ink-3"}`}>{item.label}</small>
             <b className="block text-[15px] leading-tight">{active && <span className="mr-0.5" aria-hidden="true">✓</span>}{item.day}</b>
-            <span className={`mt-0.5 block text-[9px] tabular-nums ${active ? "text-white/75" : "text-ink-3"}`}>
+            <span className={`mt-0.5 block text-[10px] tabular-nums ${active ? "text-ground/75" : "text-ink-3"}`}>
               {loading ? "· · ·" : status ? `${status.theaterCount}개 극장` : "일정 없음"}
             </span>
           </button>

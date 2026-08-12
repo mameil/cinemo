@@ -544,7 +544,7 @@ export default function TimetableExplorer({ defaultView = "movie" }: { defaultVi
       )}
 
       {/* 최근 배포 정보 — 빌드 시점에 구워짐 */}
-      <footer className="py-6 text-center text-[10.5px] text-ink-3">
+      <footer className="py-6 text-center text-[11px] text-ink-3">
         최근 배포 {formatBuildAt(process.env.NEXT_PUBLIC_BUILD_AT)} · {process.env.NEXT_PUBLIC_COMMIT}
       </footer>
       <AppNav

@@ -107,10 +107,10 @@ function StockGauge({ stock }: { stock: StockItem[] }) {
         return (
           <div key={s.theaterId} className="grid grid-cols-[96px_1fr_auto] items-center gap-2.5">
             <span className="truncate text-xs text-ink-2">{s.branchName}</span>
-            <div className="relative h-2 overflow-hidden rounded-full bg-[#edf0f4]">
+            <div className="relative h-2 overflow-hidden rounded-full bg-line-soft">
               <i className={`absolute inset-y-0 left-0 rounded-full ${gaugeClass}`} style={{ width: gaugeWidth }} />
             </div>
-            <span className={`min-w-[62px] text-right text-[11.5px] tabular-nums ${valColor}`}>
+            <span className={`min-w-[62px] text-right text-[12px] tabular-nums ${valColor}`}>
               {hasQty ? (
                 <>
                   <span className="font-bold">{s.remainingQty}</span>
@@ -139,20 +139,20 @@ function EventCard({ event, dimmed }: { event: EventItem; dimmed?: boolean }) {
   return (
     <div className={`mb-3 rounded-xl border p-3 transition-opacity ${dimmed ? "border-line/60 opacity-55" : "border-line"}`}>
       <div className="mb-1 flex items-center gap-2">
-        <span className={`rounded-[5px] px-1.5 py-0.5 text-[10.5px] font-bold text-white ${CHAIN_CLASS[event.chain] ?? "bg-ink-3"}`}>
+        <span className={`rounded-[5px] px-1.5 py-0.5 text-[11px] font-bold text-white ${CHAIN_CLASS[event.chain] ?? "bg-ink-3"}`}>
           {chainLabel}
         </span>
         {event.goodies[0] && (
           <button
             onClick={() => setShowImage((v) => !v)}
-            className={`rounded-[5px] border px-1.5 py-0.5 text-[10.5px] font-bold transition-opacity ${GOODIE_BADGE_CLASS} ${showImage ? "opacity-70" : ""}`}
+            className={`rounded-[5px] border px-1.5 py-0.5 text-[11px] font-bold transition-opacity ${GOODIE_BADGE_CLASS} ${showImage ? "opacity-70" : ""}`}
           >
             {event.goodies[0].type === "기타" ? "현장이벤트" : event.goodies[0].type}
             <span className="ml-1 font-normal">{showImage ? "▲" : <><ImageIcon size={11} /> 보기</>}</span>
           </button>
         )}
       </div>
-      <p className="text-[11.5px] text-ink-3">{event.startDate} ~ {event.endDate}</p>
+      <p className="text-[12px] text-ink-3">{event.startDate} ~ {event.endDate}</p>
       {showImage && (
         <div className="mt-2 overflow-hidden rounded-lg border border-line-soft">
           {event.detailImages.length > 0 ? (
@@ -173,12 +173,12 @@ function EventCard({ event, dimmed }: { event: EventItem; dimmed?: boolean }) {
                 loading="lazy"
                 className="w-full bg-ground object-contain"
               />
-              <p className="border-t border-line-soft bg-ground px-3 py-1.5 text-[10.5px] text-ink-3">
+              <p className="border-t border-line-soft bg-ground px-3 py-1.5 text-[11px] text-ink-3">
                 ⓘ 홍보 배너 이미지 — 실물 도안 미수집
               </p>
             </>
           ) : (
-            <div className="flex items-center justify-center gap-1.5 bg-ground py-5 text-[11.5px] text-ink-3">
+            <div className="flex items-center justify-center gap-1.5 bg-ground py-5 text-[12px] text-ink-3">
               <ImageIcon size={13} /> {chainLabel} 특전 이미지 미제공
             </div>
           )}
@@ -247,8 +247,8 @@ function ScreeningSection({
             <button
               key={d}
               onClick={() => setActiveDate(d)}
-              className={`flex-none rounded-[10px] border px-3 py-1 text-[12.5px] whitespace-nowrap ${
-                d === activeDate ? "border-ink bg-ink text-white" : "border-line"
+              className={`flex-none rounded-[10px] border px-3 py-1 text-[13px] whitespace-nowrap ${
+                d === activeDate ? "border-ink bg-ink text-ground" : "border-line"
               }`}
             >
               {label}
@@ -290,7 +290,7 @@ function ScreeningSection({
               />
               {items[0].branchName}
               {goodieCount > 0 && (
-                <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[9.5px] font-bold ${GOODIE_BADGE_CLASS}`}>
+                <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-bold ${GOODIE_BADGE_CLASS}`}>
                   <GiftIcon size={10} /> {goodieCount >= 2 ? `${goodieCount}종 · ` : ""}
                   {typeLabels.slice(0, 2).join("·")}
                   {typeLabels.length > 2 && " 외"}
@@ -352,7 +352,7 @@ function ScreeningSection({
                           {s.startTime}
                         </b>
                         {s.remainingSeats !== null && s.totalSeats !== null && (
-                          <small className={`block text-[9.5px] tabular-nums ${
+                          <small className={`block text-[10px] tabular-nums ${
                             soldout ? "text-soldout font-bold" : "text-ink-3"
                           }`}>
                             {soldout ? "매진" : `${s.remainingSeats}/${s.totalSeats}`}
@@ -454,7 +454,7 @@ export default function MovieDetailPage() {
   if (loading) {
     return (
       <main className="mx-auto max-w-[980px]">
-        <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-white/95 px-3.5 py-2.5 backdrop-blur-sm">
+        <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-panel/95 px-3.5 py-2.5 backdrop-blur-sm">
           <Link href="/movies" className="text-lg">←</Link>
           <b className="text-[15px]">불러오는 중…</b>
         </div>
@@ -466,7 +466,7 @@ export default function MovieDetailPage() {
   if (!detail) {
     return (
       <main className="mx-auto max-w-[980px]">
-        <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-white/95 px-3.5 py-2.5 backdrop-blur-sm">
+        <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-panel/95 px-3.5 py-2.5 backdrop-blur-sm">
           <Link href="/movies" className="text-lg">←</Link>
           <b className="text-[15px]">{loadError ? "불러오기 실패" : "영화를 찾을 수 없습니다"}</b>
         </div>
@@ -491,7 +491,7 @@ export default function MovieDetailPage() {
   return (
     <main className="mx-auto max-w-[980px]">
       {/* 상단 네비 */}
-      <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-white/95 px-3.5 py-2.5 backdrop-blur-sm">
+      <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-panel/95 px-3.5 py-2.5 backdrop-blur-sm">
         <Link href="/movies" className="text-lg">←</Link>
         <b className="truncate text-[15px]">{program.title}</b>
       </div>
@@ -504,9 +504,9 @@ export default function MovieDetailPage() {
               src={detail.posterUrl.replace("/w500/", "/w200/")}
               alt=""
               aria-hidden="true"
-              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
+              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-white/55 to-white" />
+            <div className="absolute inset-0 bg-gradient-to-b from-ground/20 via-ground/60 to-ground" />
           </>
         )}
       <div className="relative flex gap-3.5 px-4 pb-4 pt-4.5">
@@ -514,15 +514,15 @@ export default function MovieDetailPage() {
           <img
             src={detail.posterUrl}
             alt={`${detail.title} 포스터`}
-            className="h-[154px] w-[104px] flex-none rounded-xl object-cover shadow-md bg-[#d9dee5]"
+            className="h-[154px] w-[104px] flex-none rounded-xl object-cover shadow-md bg-line-soft"
           />
         ) : (
-          <div className="flex h-[154px] w-[104px] flex-none items-center justify-center rounded-xl bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_8px,#eef1f5_8px,#eef1f5_16px)] text-xs text-[#9aa2ad]">
+          <div className="flex h-[154px] w-[104px] flex-none items-center justify-center rounded-xl bg-[repeating-linear-gradient(135deg,#1d252c,#1d252c_8px,#161d24_8px,#161d24_16px)] text-xs text-ink-3">
             포스터 없음
           </div>
         )}
         <div>
-          <h2 className="mt-1 mb-2 text-[21px] font-bold tracking-tight">{program.title}</h2>
+          <h2 className="mt-1 mb-2 text-[22px] font-[800] tracking-[-0.02em]">{program.title}</h2>
           {program.badges.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1">
               {program.badges.map((badge) => (

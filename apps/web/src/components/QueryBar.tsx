@@ -48,7 +48,7 @@ export default function QueryBar({ chips, hint, onSubmit, onRemoveChip, onClearA
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="영화 · 장소 · 시간으로 찾기  (예: 주토피아 일산 저녁)"
-          className="flex-1 min-w-0 bg-transparent text-[13.5px] outline-none placeholder:text-ink-3"
+          className="flex-1 min-w-0 bg-transparent text-[14px] outline-none placeholder:text-ink-3"
         />
         {value.trim() && (
           <button type="submit" className="flex-none text-[12px] font-bold text-app">
@@ -65,7 +65,7 @@ export default function QueryBar({ chips, hint, onSubmit, onRemoveChip, onClearA
               <button
                 key={c.key}
                 onClick={() => onRemoveChip(c.key)}
-                className="inline-flex items-center gap-1 rounded-full border border-app bg-app-tint px-2 py-0.5 text-[11.5px] font-semibold text-app hover:opacity-70 transition-opacity"
+                className="inline-flex items-center gap-1 rounded-full border border-app bg-app-tint px-2 py-0.5 text-[12px] font-semibold text-app hover:opacity-70 transition-opacity"
               >
                 <ChipIcon size={11} /> {c.label} <XIcon size={10} />
               </button>

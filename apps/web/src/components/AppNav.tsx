@@ -55,7 +55,7 @@ export default function AppNav({ active, date }: { active: NavKey; date?: string
           aria-label="전체 영화 검색"
           onSubmit={submitSearch}
           onClick={(event) => event.stopPropagation()}
-          className="flex w-full max-w-[620px] items-center gap-2 rounded-2xl bg-white p-3 shadow-xl"
+          className="flex w-full max-w-[620px] items-center gap-2 rounded-2xl border border-line bg-panel p-3 shadow-xl"
         >
           <SearchIcon size={15} className="text-ink-3" />
           <input
@@ -66,12 +66,12 @@ export default function AppNav({ active, date }: { active: NavKey; date?: string
             placeholder="영화 · 장소 · 시간으로 찾기"
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-3"
           />
-          <button type="submit" disabled={!query.trim()} className="rounded-full bg-app px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40">찾기</button>
+          <button type="submit" disabled={!query.trim()} className="rounded-full bg-app px-3 py-1.5 text-xs font-bold text-ground disabled:opacity-40">찾기</button>
           <button type="button" onClick={() => { setShowSearch(false); searchButtonRef.current?.focus(); }} className="px-1 text-ink-3" aria-label="검색 닫기"><XIcon size={15} /></button>
         </form>
       </div>
     )}
-    <nav className="sticky bottom-3 z-20 mx-4 grid grid-cols-6 rounded-2xl border border-line bg-white/95 p-1.5 shadow-lg backdrop-blur-sm sm:mx-auto sm:max-w-[560px]" aria-label="주요 메뉴">
+    <nav className="sticky bottom-3 z-20 mx-4 grid grid-cols-6 rounded-2xl border border-line bg-panel/95 p-1.5 shadow-lg backdrop-blur-sm sm:mx-auto sm:max-w-[560px]" aria-label="주요 메뉴">
       {items.map((item) => {
         const selected = item.key === active;
         return (

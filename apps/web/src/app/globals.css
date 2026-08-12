@@ -1,35 +1,37 @@
 @import "tailwindcss";
 
 @theme {
-  /* 앱 액센트 */
-  --color-app: #0f766e;
-  --color-app-tint: #e2f1ef;
+  /* 앱 액센트 — 다크 위에서 발광하는 청록 */
+  --color-app: #2dd4bf;
+  --color-app-tint: #10332e;
 
-  /* 체인 아이덴티티 */
-  --color-cgv: #e4002b;
-  --color-lotte: #ed6c00;
-  --color-mega: #6d2e9e;
+  /* 체인 아이덴티티 — 다크 배경 대비 밝기 보정 */
+  --color-cgv: #ff4d67;
+  --color-lotte: #ff9433;
+  --color-mega: #ab72ec;
+  --color-indie: #8b97a3;
 
   /* 좌석/상태 시맨틱 */
-  --color-ok: #15803d;
-  --color-low: #c2620a;
-  --color-soldout: #c81e2b;
+  --color-ok: #3ecf8e;
+  --color-low: #f0a44a;
+  --color-soldout: #ff5c6c;
 
   /* 특전 시맨틱 — 앱 액센트와 같은 청록 계열로 통일 */
-  --color-goodie: #0f766e;
-  --color-goodie-tint: #e2f1ef;
-  --color-goodie-line: #b7dcd6;
+  --color-goodie: #2dd4bf;
+  --color-goodie-tint: #10332e;
+  --color-goodie-line: #1e5a51;
 
-  /* 표면 */
-  --color-ground: #eef1f5;
-  --color-panel: #ffffff;
-  --color-line: #e2e6ec;
-  --color-line-soft: #eef1f5;
+  /* 표면 — 시네마 다크 (페이지 < 카드 < 엘리베이티드) */
+  --color-ground: #0e1215;
+  --color-panel: #161c21;
+  --color-panel-2: #242d35;
+  --color-line: #2a333b;
+  --color-line-soft: #1e262d;
 
   /* 텍스트 */
-  --color-ink: #191d24;
-  --color-ink-2: #4a515c;
-  --color-ink-3: #858d99;
+  --color-ink: #e8ecef;
+  --color-ink-2: #a9b3bc;
+  --color-ink-3: #76828e;
 }
 
 body {
@@ -47,13 +49,13 @@ body {
 
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: #d3d8df transparent;
+  scrollbar-color: #2c353d transparent;
 }
 .scrollbar-thin::-webkit-scrollbar {
   width: 5px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #d3d8df;
+  background: #2c353d;
   border-radius: 3px;
 }
 

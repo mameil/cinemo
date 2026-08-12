@@ -72,7 +72,7 @@ function TheaterRow({
       ? "var(--color-lotte)"
       : theater.chain === "MEGA"
         ? "var(--color-mega)"
-        : "#555";
+        : "var(--color-indie)";
 
   return (
     <div className={`flex items-center border-b border-line-soft last:border-b-0 ${hasSchedule ? "hover:bg-ground" : "opacity-60"}`}>
@@ -94,9 +94,9 @@ function TheaterRow({
             <small className="text-[10px] text-ink-3">
               {!hasSchedule ? emptyLabel : theater.next ? `다음 상영 ${theater.next}` : "오늘 상영 종료"}
             </small>
-            <small className="text-[9px] text-ink-3">· {updateLabel(theater.updatedAt)}</small>
+            <small className="text-[10px] text-ink-3">· {updateLabel(theater.updatedAt)}</small>
             {stale && (
-              <small className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[8.5px] font-bold text-amber-800">
+              <small className="rounded-full border border-amber-400/25 bg-amber-400/10 px-1.5 py-px text-[10px] font-bold text-amber-300">
                 정보 확인 필요
               </small>
             )}
@@ -241,12 +241,12 @@ export default function TheatersPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-[980px] pb-12">
-      <header className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 pb-3 pt-4 backdrop-blur-sm">
+      <header className="sticky top-0 z-10 border-b border-line bg-panel/95 px-4 pb-3 pt-4 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <Link href="/" className="text-lg" aria-label="홈으로">←</Link>
           <div>
-            <p className="text-[11px] font-bold tracking-[0.16em] text-app">THEATERS</p>
-            <h1 className="text-lg font-extrabold">극장별 시간표</h1>
+            <p className="text-[11px] font-extrabold tracking-[0.24em] text-app">THEATERS</p>
+            <h1 className="text-[20px] font-[900] tracking-[-0.02em]">극장별 시간표</h1>
           </div>
           <button
             type="button"
@@ -368,7 +368,7 @@ export default function TheatersPage() {
             type="button"
             onClick={openComparison}
             disabled={compareTheaters.size < 2}
-            className="w-full rounded-2xl bg-app px-4 py-3 text-sm font-extrabold text-white shadow-lg disabled:bg-ink-3 disabled:opacity-70"
+            className="w-full rounded-2xl bg-app px-4 py-3 text-sm font-extrabold text-ground shadow-lg disabled:bg-ink-3 disabled:opacity-70"
           >
             {compareTheaters.size < 2 ? `비교할 극장을 ${2 - compareTheaters.size}곳 더 선택하세요` : `${compareTheaters.size}개 극장 시간표 비교`}
           </button>

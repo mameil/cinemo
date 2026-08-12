@@ -4,7 +4,7 @@ export const CHAIN_COLOR: Record<Chain, string> = {
   CGV: "var(--color-cgv)",
   LOTTE: "var(--color-lotte)",
   MEGA: "var(--color-mega)",
-  INDIE: "#555",
+  INDIE: "var(--color-indie)",
 };
 
 export const CHAIN_LABEL: Record<Chain, string> = {
@@ -35,7 +35,7 @@ export function formatLabel(format: string | null): {
 
 /** 특전 종류 배지 — 체인 필터 칩과 같은 스타일 (청록 테두리 + 연민트 배경) */
 export const GOODIE_BADGE_CLASS =
-  "text-goodie border-goodie bg-goodie-tint hover:bg-[#d3e9e6]";
+  "text-goodie border-goodie bg-goodie-tint hover:bg-goodie-line/40";
 
 /** 특전 받는 상영 칩 틴트 */
 export const GOODIE_CHIP_CLASS = "border-goodie-line bg-goodie-tint/60";

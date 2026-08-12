@@ -13,7 +13,7 @@ const CHAINS: { key: Chain; label: string; color: string }[] = [
   { key: "CGV", label: "CGV", color: "var(--color-cgv)" },
   { key: "LOTTE", label: "롯데", color: "var(--color-lotte)" },
   { key: "MEGA", label: "메가", color: "var(--color-mega)" },
-  { key: "INDIE", label: "독립", color: "#555" },
+  { key: "INDIE", label: "독립", color: "var(--color-indie)" },
 ];
 
 export interface TheaterInfo {
@@ -83,7 +83,7 @@ const CHAIN_COLORS: Record<string, string> = {
   CGV: "var(--color-cgv)",
   LOTTE: "var(--color-lotte)",
   MEGA: "var(--color-mega)",
-  INDIE: "#555",
+  INDIE: "var(--color-indie)",
 };
 
 export default function HomeHeader({
@@ -166,14 +166,14 @@ export default function HomeHeader({
   }, [showMobileFilters]);
 
   return (
-    <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 pt-3.5 pb-2.5">
+    <div className="sticky top-0 z-10 border-b border-line bg-panel/95 px-4 pt-3.5 pb-2.5">
       {/* 0행: 쿼리 한 줄 */}
       {queryBar && <div className="mb-2.5">{queryBar}</div>}
 
       {/* 1행: 제목 + 신선도 */}
       <div className="flex min-w-0 items-start gap-2">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-extrabold tracking-tight">지금 상영 시간표</h1>
+          <h1 className="text-[20px] font-[900] tracking-[-0.02em]">지금 상영 시간표</h1>
           <button
             onClick={() => {
               setShowMovies(false);
@@ -195,7 +195,7 @@ export default function HomeHeader({
         <button
           onClick={onRefresh}
           disabled={refreshing}
-          className="max-w-[48%] flex-none text-right text-[10.5px] leading-snug text-ink-3 hover:text-app transition-colors disabled:opacity-50"
+          className="max-w-[48%] flex-none text-right text-[11px] leading-snug text-ink-3 hover:text-app transition-colors disabled:opacity-50"
         >
           <RefreshIcon size={10} className={refreshing ? "animate-spin" : ""} />
           {" "}상영 {freshness(updatedAt)}
@@ -217,9 +217,9 @@ export default function HomeHeader({
                   onClick={() => onToggleArea(area)}
                   className="mb-1.5 flex items-center gap-2 text-[12px] font-bold text-ink-2 hover:text-app transition-colors"
                 >
-                  <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border text-[9px] ${
+                  <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border text-[10px] ${
                     allChecked
-                      ? "border-app bg-app text-white"
+                      ? "border-app bg-app text-ground"
                       : noneChecked
                         ? "border-ink-3 bg-panel"
                         : "border-app bg-app-tint text-app"
@@ -238,7 +238,7 @@ export default function HomeHeader({
                       <button
                         key={t.id}
                         onClick={() => onToggleTheater(t.id)}
-                        className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11.5px] transition-colors ${
+                        className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[12px] transition-colors ${
                           closed
                             ? "border-line-soft bg-ground text-ink-3 opacity-60"
                             : active
@@ -248,10 +248,10 @@ export default function HomeHeader({
                       >
                         <span
                           className="h-[6px] w-[6px] rounded-full flex-none"
-                          style={{ background: active && !closed ? (CHAIN_COLORS[t.chain] ?? "#999") : "#ccc" }}
+                          style={{ background: active && !closed ? (CHAIN_COLORS[t.chain] ?? "var(--color-indie)") : "#3a444e" }}
                         />
                         {t.branchName}
-                        {closed && <span className="ml-0.5 text-[9.5px] text-ink-3">· {emptyLabel}</span>}
+                        {closed && <span className="ml-0.5 text-[10px] text-ink-3">· {emptyLabel}</span>}
                       </button>
                     );
                   })}
@@ -304,14 +304,14 @@ export default function HomeHeader({
                           }`}
                         />
                       ) : (
-                        <div className={`flex h-[72px] w-[50px] items-center justify-center rounded-lg bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_6px,#eef1f5_6px,#eef1f5_12px)] text-[#aab1bb] shadow-sm transition-all ${
+                        <div className={`flex h-[72px] w-[50px] items-center justify-center rounded-lg bg-[repeating-linear-gradient(135deg,#1d252c,#1d252c_6px,#161d24_6px,#161d24_12px)] text-ink-3 shadow-sm transition-all ${
                           active ? "ring-2 ring-app" : "opacity-60"
                         }`}>
                           <FilmIcon size={16} />
                         </div>
                       )}
                       {active ? (
-                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-app text-[9px] text-white shadow">
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-app text-[10px] text-ground shadow">
                           ✓
                         </span>
                       ) : (
@@ -343,20 +343,20 @@ export default function HomeHeader({
       />
 
       {isPartialCoverage && selectedCoverage && (
-        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+        <div className="mt-2 rounded-lg border border-amber-400/25 bg-amber-400/10 px-2.5 py-1.5 text-[11px] text-amber-300">
           아직 일부 극장 일정만 등록됐어요 · {selectedCoverage.theaterCount}/{coverage.theaterCount}개 극장
         </div>
       )}
 
       {/* 뷰 토글 + 지금 이후 */}
       <div className="mt-2.5 flex items-center gap-2">
-        <div className="inline-flex rounded-[10px] bg-[#e7ebf1] p-0.5">
+        <div className="inline-flex rounded-[10px] bg-ground p-0.5">
           <button
             onClick={() => onViewChange("movie")}
             aria-pressed={view === "movie"}
-            className={`inline-flex items-center gap-1 rounded-lg px-3 py-1 text-[12.5px] font-bold ${
+            className={`inline-flex items-center gap-1 rounded-lg px-3 py-1 text-[13px] font-bold ${
               view === "movie"
-                ? "bg-white text-ink shadow-sm"
+                ? "bg-panel-2 text-ink shadow-sm"
                 : "text-ink-2"
             }`}
           >
@@ -365,9 +365,9 @@ export default function HomeHeader({
           <button
             onClick={() => onViewChange("time")}
             aria-pressed={view === "time"}
-            className={`inline-flex items-center gap-1 rounded-lg px-3 py-1 text-[12.5px] font-bold ${
+            className={`inline-flex items-center gap-1 rounded-lg px-3 py-1 text-[13px] font-bold ${
               view === "time"
-                ? "bg-white text-ink shadow-sm"
+                ? "bg-panel-2 text-ink shadow-sm"
                 : "text-ink-2"
             }`}
           >
@@ -384,7 +384,7 @@ export default function HomeHeader({
           onClick={() => setShowMobileFilters(true)}
           className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-line bg-panel px-3 py-1 text-xs font-bold text-ink-2 sm:hidden"
         >
-          <SlidersIcon size={12} /> 필터{filterCount > 0 && <span className="rounded-full bg-app px-1.5 text-[9px] text-white">{filterCount}</span>}
+          <SlidersIcon size={12} /> 필터{filterCount > 0 && <span className="rounded-full bg-app px-1.5 text-[10px] text-ground">{filterCount}</span>}
         </button>
         {view !== "time" && (
           <button
@@ -410,7 +410,7 @@ export default function HomeHeader({
             key={c.key}
             onClick={() => onToggleChain(c.key)}
             aria-pressed={active}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12.5px] font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[13px] font-semibold transition-colors ${
                 active
                   ? "border-app bg-app-tint text-app"
                   : "border-line bg-panel text-ink-3 opacity-50"
@@ -418,7 +418,7 @@ export default function HomeHeader({
             >
               <span
                 className="h-[7px] w-[7px] rounded-full"
-                style={{ background: active ? c.color : "#ccc" }}
+                style={{ background: active ? c.color : "#3a444e" }}
               />
               <CheckIcon size={11} className={active ? "" : "opacity-0"} />{c.label}
             </button>
@@ -427,7 +427,7 @@ export default function HomeHeader({
         <button
           onClick={() => onGoodieOnlyChange(!goodieOnly)}
           aria-pressed={goodieOnly}
-          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12.5px] font-semibold transition-colors ${
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[13px] font-semibold transition-colors ${
             goodieOnly
               ? "border-goodie bg-goodie-tint text-goodie"
               : "border-line bg-panel text-ink-2"
@@ -437,7 +437,7 @@ export default function HomeHeader({
         </button>
         <button
           onClick={() => { setShowMovies((v) => !v); setShowTheaters(false); }}
-          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12.5px] transition-colors ${
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[13px] transition-colors ${
             showMovies || excludedMovies.size > 0
               ? "border-app bg-app-tint text-app font-semibold"
               : "border-line bg-panel text-ink-2"
@@ -452,7 +452,7 @@ export default function HomeHeader({
 
       {/* 활성 필터 초기화 바 */}
       {(hasTheaterFilter || hasMovieFilter) && (
-        <div className="mt-2 hidden items-center gap-2 text-[11.5px] sm:flex">
+        <div className="mt-2 hidden items-center gap-2 text-[12px] sm:flex">
           <span className="text-ink-3">필터 적용 중:</span>
           {hasTheaterFilter && (
             <button
@@ -494,7 +494,7 @@ export default function HomeHeader({
             aria-modal="true"
             aria-label="상세 필터"
             tabIndex={-1}
-            className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-3xl bg-white px-4 pb-7 pt-3 shadow-2xl outline-none"
+            className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-3xl bg-panel px-4 pb-7 pt-3 shadow-2xl outline-none"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" />
             <div className="flex items-center gap-2">
@@ -571,7 +571,7 @@ export default function HomeHeader({
                             key={theater.id}
                             onClick={() => onToggleTheater(theater.id)}
                             aria-pressed={active}
-                            className={`rounded-lg border px-2 py-1 text-[11px] ${active ? "border-line bg-white text-ink-2" : "border-line-soft text-ink-3 line-through opacity-50"}`}
+                            className={`rounded-lg border px-2 py-1 text-[11px] ${active ? "border-line bg-panel-2 text-ink-2" : "border-line-soft text-ink-3 line-through opacity-50"}`}
                           >
                             {active && <span aria-hidden="true">✓ </span>}{theater.branchName}{theater.openToday === false && ` · ${emptyLabel}`}
                           </button>
@@ -597,8 +597,8 @@ export default function HomeHeader({
                       <button key={movie.id} onClick={() => onToggleMovie(movie.id)} aria-pressed={active} className="w-[58px] flex-none">
                         {movie.posterUrl ? (
                           <img src={movie.posterUrl.replace("/w500/", "/w200/")} alt={`${movie.title} 포스터`} className={`h-[78px] w-[54px] rounded-lg object-cover ${active ? "ring-2 ring-app" : "opacity-45"}`} />
-                        ) : <div className={`flex h-[78px] w-[54px] items-center justify-center rounded-lg bg-line-soft text-[#aab1bb] ${active ? "ring-2 ring-app" : "opacity-45"}`}><FilmIcon size={16} /></div>}
-                        <span className="mt-1 block truncate text-[9.5px]">{active && <span aria-hidden="true">✓ </span>}{movie.title}</span>
+                        ) : <div className={`flex h-[78px] w-[54px] items-center justify-center rounded-lg bg-line-soft text-ink-3 ${active ? "ring-2 ring-app" : "opacity-45"}`}><FilmIcon size={16} /></div>}
+                        <span className="mt-1 block truncate text-[10px]">{active && <span aria-hidden="true">✓ </span>}{movie.title}</span>
                       </button>
                     );
                   })}

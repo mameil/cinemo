@@ -87,7 +87,7 @@ function TimeChip({ s }: { s: ScreeningCard }) {
         {s.startTime}
       </b>
       {s.remainingSeats !== null && s.totalSeats !== null && (
-        <small className={`mt-0.5 text-[8.5px] tabular-nums leading-none ${
+        <small className={`mt-0.5 text-[10px] tabular-nums leading-none ${
           isSoldout ? "text-soldout" : isLow ? "text-low font-bold" : "text-ink-3"
         }`}>
           {isSoldout ? "매진" : `${s.remainingSeats}/${s.totalSeats}`}
@@ -162,10 +162,10 @@ function MovieGroupCard({
             <img
               src={g.movie.posterUrl.replace("/w500/", "/w200/")}
               alt={`${g.movie.title} 포스터`}
-              className="h-[80px] w-[55px] rounded-[9px] object-cover bg-[#dfe4ea]"
+              className="h-[80px] w-[55px] rounded-[9px] object-cover bg-line-soft"
             />
           ) : (
-            <div className="flex h-[80px] w-[55px] items-center justify-center rounded-[9px] bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_6px,#eef1f5_6px,#eef1f5_12px)] text-[#aab1bb]">
+            <div className="flex h-[80px] w-[55px] items-center justify-center rounded-[9px] bg-[repeating-linear-gradient(135deg,#1d252c,#1d252c_6px,#161d24_6px,#161d24_12px)] text-ink-3">
               <FilmIcon size={18} />
             </div>
           )}
@@ -184,7 +184,7 @@ function MovieGroupCard({
           {program.badges.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {program.badges.map((badge) => (
-                <span key={badge} className="rounded-full border border-app/25 bg-app-tint px-1.5 py-px text-[9.5px] font-bold text-app">{badge}</span>
+                <span key={badge} className="rounded-full border border-app/25 bg-app-tint px-1.5 py-px text-[10px] font-bold text-app">{badge}</span>
               ))}
             </div>
           )}
@@ -204,7 +204,7 @@ function MovieGroupCard({
                 chainEntries.length > 0 &&
                 onPeek({ movieTitle: g.movie.title, type: null, entries: chainEntries })
               }
-              className="mt-1 text-[11.5px] text-goodie font-semibold hover:underline"
+              className="mt-1 text-[12px] text-goodie font-semibold hover:underline"
             >
               <GiftIcon size={11} /> 특전 {g.eventTypes.length}종 <span className="text-[10px] font-normal text-ink-3">눌러서 보기</span>
             </button>
@@ -264,7 +264,7 @@ function MovieGroupCard({
                 {theaterEventTypes.length > 0 && (
                   <button
                     onClick={() => peekChain(null, undefined, undefined, new Set(theaterEventTypes))}
-                    className={`rounded-full border px-1.5 py-px text-[9.5px] font-bold transition-colors cursor-pointer whitespace-nowrap ${GOODIE_BADGE_CLASS}`}
+                    className={`rounded-full border px-1.5 py-px text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap ${GOODIE_BADGE_CLASS}`}
                   >
                     <GiftIcon size={10} /> {theaterEventTypes.length >= 2 ? `${theaterEventTypes.length}종 · ` : ""}
                     {typeLabels.slice(0, 2).join("·")}
@@ -348,7 +348,7 @@ function MovieGroupCard({
       {g.byTheater.length > collapsedMax && (
         <Link
           href={`/movies/${g.movie.id}`}
-          className="block w-full border-t border-line-soft py-2 text-center text-[11.5px] font-semibold text-ink-3 hover:text-app transition-colors"
+          className="block w-full border-t border-line-soft py-2 text-center text-[12px] font-semibold text-ink-3 hover:text-app transition-colors"
         >
           나머지 {hiddenCount}곳 시간표 보기 →
         </Link>
@@ -407,7 +407,7 @@ export default function MovieGroupView({
           <select
             value={sort}
             onChange={(event) => setSort(event.target.value as MovieSort)}
-            className="rounded-lg border border-line bg-panel px-2 py-1 text-[11.5px] font-semibold text-ink outline-none focus:border-app"
+            className="rounded-lg border border-line bg-panel px-2 py-1 text-[12px] font-semibold text-ink outline-none focus:border-app"
           >
             <option value="next">빠른 상영순</option>
             <option value="popular">상영 많은 순</option>

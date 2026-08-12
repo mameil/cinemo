@@ -36,7 +36,7 @@ const CHAIN_CLASS: Record<string, string> = {
   CGV: "bg-cgv",
   LOTTE: "bg-lotte",
   MEGA: "bg-mega",
-  INDIE: "bg-[#555]",
+  INDIE: "bg-indie",
 };
 
 const CHAINS: Chain[] = ["CGV", "LOTTE", "MEGA", "INDIE"];
@@ -200,16 +200,16 @@ export default function EventsFeedPage() {
   return (
     <main className="mx-auto max-w-[980px]">
       {/* 상단 네비 */}
-      <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-white/95 px-3.5 py-2.5 backdrop-blur-sm">
+      <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-panel/95 px-3.5 py-2.5 backdrop-blur-sm">
         <Link href={navDate ? `/?date=${navDate}` : "/"} className="text-lg">←</Link>
         <b className="inline-flex items-center gap-1.5 text-[15px]"><GiftIcon size={14} className="text-goodie" /> 특전</b>
         <span className="text-[11px] text-ink-3">받을 수 있는 특전부터</span>
         {/* 카드/리스트 토글 */}
-        <div className="ml-auto inline-flex rounded-[10px] bg-[#e7ebf1] p-0.5">
+        <div className="ml-auto inline-flex rounded-[10px] bg-ground p-0.5">
           <button
             onClick={() => setView("card")}
             className={`rounded-lg px-2.5 py-0.5 text-[12px] font-bold ${
-              view === "card" ? "bg-white text-ink shadow-sm" : "text-ink-2"
+              view === "card" ? "bg-panel-2 text-ink shadow-sm" : "text-ink-2"
             }`}
           >
             카드
@@ -217,7 +217,7 @@ export default function EventsFeedPage() {
           <button
             onClick={() => setView("list")}
             className={`rounded-lg px-2.5 py-0.5 text-[12px] font-bold ${
-              view === "list" ? "bg-white text-ink shadow-sm" : "text-ink-2"
+              view === "list" ? "bg-panel-2 text-ink shadow-sm" : "text-ink-2"
             }`}
           >
             리스트
@@ -288,7 +288,7 @@ export default function EventsFeedPage() {
               className="inline-flex items-center gap-1 rounded-full border border-line bg-panel px-2 py-0.5 text-ink-2 line-through hover:border-app hover:text-app hover:no-underline transition-colors"
               title="다시 보기"
             >
-              {c.kind === "movie" && <FilmIcon size={10} />}{c.label} <span className="text-[9px] no-underline">↩</span>
+              {c.kind === "movie" && <FilmIcon size={10} />}{c.label} <span className="text-[10px] no-underline">↩</span>
             </button>
           ))}
           <button
@@ -357,7 +357,7 @@ export default function EventsFeedPage() {
                     className="h-14 w-14 flex-none rounded-lg object-cover object-top bg-ground"
                   />
                 ) : (
-                  <div className="flex h-14 w-14 flex-none items-center justify-center rounded-lg bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_6px,#eef1f5_6px,#eef1f5_12px)] text-[#aab1bb]">
+                  <div className="flex h-14 w-14 flex-none items-center justify-center rounded-lg bg-[repeating-linear-gradient(135deg,#1d252c,#1d252c_6px,#161d24_6px,#161d24_12px)] text-ink-3">
                     <GiftIcon size={16} />
                   </div>
                 )}
@@ -366,24 +366,24 @@ export default function EventsFeedPage() {
                   <div className="flex items-center gap-1.5">
                     <span
                       className="h-2 w-2 flex-none rounded-full"
-                      style={{ background: CHAIN_COLOR[e.chain as Chain] ?? "#999" }}
+                      style={{ background: CHAIN_COLOR[e.chain as Chain] ?? "var(--color-indie)" }}
                     />
                     <p className="truncate text-[13px] font-semibold">{mainName}</p>
                     {e.isNew && (
-                      <span className="flex-none rounded bg-soldout px-1 py-px text-[8.5px] font-bold text-white">NEW</span>
+                      <span className="flex-none rounded bg-soldout px-1 py-px text-[10px] font-bold text-white">NEW</span>
                     )}
                     {e.upcoming && (
-                      <span className="flex-none rounded bg-ink px-1 py-px text-[8.5px] font-bold text-white">예정</span>
+                      <span className="flex-none rounded bg-ink px-1 py-px text-[10px] font-bold text-ground">예정</span>
                     )}
                   </div>
-                  <p className="mt-0.5 truncate text-[10.5px] text-ink-3">
+                  <p className="mt-0.5 truncate text-[11px] text-ink-3">
                     {e.types.map((t) => (t === "기타" ? "이벤트" : t)).join("·")}
                     {e.movie && <> · <FilmIcon size={10} /> {e.movie.title}</>}
                   </p>
-                  <span className={`mt-1 inline-block rounded-full border px-1.5 py-px text-[9.5px] font-bold ${status.className}`}>{status.text}</span>
+                  <span className={`mt-1 inline-block rounded-full border px-1.5 py-px text-[10px] font-bold ${status.className}`}>{status.text}</span>
                 </div>
                 {/* 우측: 기간·지역 */}
-                <div className="flex-none text-right text-[10.5px] leading-snug">
+                <div className="flex-none text-right text-[11px] leading-snug">
                   <p className={`font-bold ${e.allSoldOut ? "text-soldout" : "text-ink-2"}`}>
                     {e.allSoldOut ? "전국 소진" : data ? dday(e.endDate, data.today) : ""}
                   </p>
@@ -433,23 +433,23 @@ export default function EventsFeedPage() {
                         className="h-full w-full object-cover object-top"
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center bg-[repeating-linear-gradient(135deg,#e7ebf0,#e7ebf0_8px,#eef1f5_8px,#eef1f5_16px)] px-3 text-center text-[11px] text-[#9aa2ad]">
+                      <div className="flex h-full items-center justify-center bg-[repeating-linear-gradient(135deg,#1d252c,#1d252c_8px,#161d24_8px,#161d24_16px)] px-3 text-center text-[11px] text-ink-3">
                         이미지 미제공
                       </div>
                     )}
                     <div className="absolute left-1.5 top-1.5 flex gap-1">
-                      <span className={`rounded px-1.5 py-0.5 text-[9.5px] font-bold text-white ${CHAIN_CLASS[e.chain] ?? "bg-ink-3"}`}>
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold text-white ${CHAIN_CLASS[e.chain] ?? "bg-ink-3"}`}>
                         {CHAIN_LABEL[e.chain as Chain] ?? e.chain}
                       </span>
                       {e.isNew && (
-                        <span className="rounded bg-soldout px-1.5 py-0.5 text-[9.5px] font-bold text-white">NEW</span>
+                        <span className="rounded bg-soldout px-1.5 py-0.5 text-[10px] font-bold text-white">NEW</span>
                       )}
                       {e.upcoming && (
-                        <span className="rounded bg-ink px-1.5 py-0.5 text-[9.5px] font-bold text-white">예정</span>
+                        <span className="rounded bg-ink px-1.5 py-0.5 text-[10px] font-bold text-ground">예정</span>
                       )}
                     </div>
                     {e.allSoldOut && (
-                      <span className="absolute bottom-1.5 right-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9.5px] font-bold text-white">
+                      <span className="absolute bottom-1.5 right-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">
                         전국 소진
                       </span>
                     )}
@@ -457,18 +457,18 @@ export default function EventsFeedPage() {
                   <div className="p-2">
                     <div className="mb-1 flex flex-wrap gap-1">
                       {e.types.slice(0, 2).map((t) => (
-                        <span key={t} className={`rounded border px-1 py-px text-[9px] font-bold ${GOODIE_BADGE_CLASS}`}>
+                        <span key={t} className={`rounded border px-1 py-px text-[10px] font-bold ${GOODIE_BADGE_CLASS}`}>
                           {t === "기타" ? "이벤트" : t}
                         </span>
                       ))}
                     </div>
-                    <p className="line-clamp-2 text-[12.5px] font-semibold leading-snug">{mainName}</p>
-                    {e.movie && <p className="mt-1 truncate text-[10.5px] font-semibold text-ink-2"><FilmIcon size={10} /> {e.movie.title}</p>}
-                    <span className={`mt-1.5 inline-block rounded-full border px-1.5 py-0.5 text-[9.5px] font-bold ${status.className}`}>
+                    <p className="line-clamp-2 text-[13px] font-semibold leading-snug">{mainName}</p>
+                    {e.movie && <p className="mt-1 truncate text-[11px] font-semibold text-ink-2"><FilmIcon size={10} /> {e.movie.title}</p>}
+                    <span className={`mt-1.5 inline-block rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${status.className}`}>
                       {status.text}
                     </span>
                     {e.todayScreenings.length > 0 && (
-                      <div className="mt-1.5 rounded-lg bg-ground px-2 py-1.5 text-[9.5px] leading-relaxed text-ink-2">
+                      <div className="mt-1.5 rounded-lg bg-ground px-2 py-1.5 text-[10px] leading-relaxed text-ink-2">
                         <b>오늘 상영</b>
                         {e.todayScreenings.slice(0, 2).map((screening) => (
                           <p key={screening.theaterId} className="truncate">
@@ -478,7 +478,7 @@ export default function EventsFeedPage() {
                         {e.todayScreenings.length > 2 && <p className="text-ink-3">외 {e.todayScreenings.length - 2}곳</p>}
                       </div>
                     )}
-                    <p className="mt-1 text-[10.5px] text-ink-3">
+                    <p className="mt-1 text-[11px] text-ink-3">
                       {data ? dday(e.endDate, data.today) : ""}
                       {e.corridorCount > 0
                         ? ` · 내 지역 ${e.corridorCount}곳`
@@ -519,7 +519,7 @@ export default function EventsFeedPage() {
                     ✕
                   </button>
                 </div>
-                <p className="border-t border-line-soft px-2 py-1 text-[9px] text-ink-3">{checkedAgo(e.lastCheckedAt)}</p>
+                <p className="border-t border-line-soft px-2 py-1 text-[10px] text-ink-3">{checkedAgo(e.lastCheckedAt)}</p>
               </div>
             );
           })}
