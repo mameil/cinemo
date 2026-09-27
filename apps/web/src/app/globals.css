@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
 @theme {
+  /* ── 티켓 리디자인 (feat/ticket-redesign) ── */
+  /* 히어로 액센트 — 버밀리언 (팔레트 전환 대비 토큰 1곳) */
+  --color-tk: #ff3b30;
+  --color-tk-deep: #e02417;
+  /* 티켓 타이포 */
+  --font-display: "Black Han Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
   /* 앱 액센트 — 다크 위에서 발광하는 청록 */
   --color-app: #2dd4bf;
   --color-app-tint: #10332e;
@@ -35,8 +43,8 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
-    "Pretendard", system-ui, sans-serif;
+  font-family: "IBM Plex Sans KR", "Pretendard", -apple-system,
+    BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
