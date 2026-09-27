@@ -2,8 +2,10 @@
 
 import type { CollectedScreening } from "../domain";
 
+// 표준 443 포트를 쓴다. 비표준 :30443은 GitHub Actions 등 일부 egress에서 막혀
+// 프로덕션 수집이 전부 0건이 됐다(로컬은 :30443도 통과 → 발견 지연). (2026-09-27)
 const API =
-  "https://api.dtryx.com:30443/dtryx/cms/thirdparty/movie/third-party-type2-timetable-list" +
+  "https://api.dtryx.com/dtryx/cms/thirdparty/movie/third-party-type2-timetable-list" +
   "?BrandCd=indieart&CinemaCd=000067&ChannelCd=homepage&EngVerYn=N" +
   "&PlaySDT={date}&ImgSize=small&WorkGuID=37E0BA0F-DA5F-4376-9BA4-B5D27286AB87";
 const BOOKING_URL = "https://arthousemomo.co.kr/showtimes";
