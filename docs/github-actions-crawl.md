@@ -106,7 +106,37 @@ env:
     `pnpm crawl:schedule -- --all`(수도권 전체, 예산 주의).
 - 실패 시 exit 1 → 굿즈 크롤과 동일하게 GitHub 알림 + Job Summary 표.
 
-> 즉 자동화는 **크론 2개**: 굿즈/소진(3시간) + 상영시간표(하루 1회).
+> 즉 **상시** 자동화는 크론 2개: 굿즈/소진(3시간) + 상영시간표(하루 1회).
+> (독립영화관 인스타는 `insta.yml`, 일회성 예매 알람은 아래 2-2)
+
+## 2-2. 세 번째 워크플로우 — 예매 오픈 알람 (watch-satantango.yml)
+
+**일회성 알람 전용.** 특정 극장·날짜·영화의 예매가 열리는 순간을 잡는다.
+데이터 적재와 무관해 DB도 시크릿도 쓰지 않는다 (`CURL_IMPERSONATE_BIN`만).
+
+- 감시기: `packages/crawler/src/cgv/watch-open.ts` (`pnpm --filter @cinemo/crawler cgv-watch`)
+  - `--site` / `--date` / `--movie` (또는 `WATCH_SITE/DATE/MOVIE` env)
+  - 종료코드 0=미오픈 · 1=주목 필요 · 2=수집 실패
+- 크론 10분. **워크플로우 이름이 곧 알림 메일 제목**이 되게 설계 (GitHub은 성공 알림을
+  못 보내므로 "감지 = 의도적 실패"로 매핑). Job Summary에 회차·잔여좌석이 찍힌다.
+- 중복 메일 방지: `actions/cache` 마커 — 캐시 키 불변성을 "1회만 발송" 보장으로 쓴다.
+  수집 실패 알림은 별도 마커라 장애 1통과 별개로 감시는 계속된다.
+- 알람 조건 2개: ⓐ 해당 영화 회차 등장 ⓑ 날짜는 열렸는데 그 영화가 편성에 없음
+  (ⓑ도 알리는 이유 — 특별전 종료를 모르고 계속 기다리는 게 최악)
+
+**로컬 1분 이중화** (`scripts/cgv-watch-local.sh` + `cgv-watch-setup.sh`)
+맥이 켜져 있을 때만 도는 고빈도 경로. 알림센터+소리+음성(`say`)+브라우저 자동 오픈,
+알림 상한 5회. `sh scripts/cgv-watch-setup.sh` 등록 / `--remove` 해제.
+
+### 함정 기록
+
+- **CGV `searchMovScnInfo`는 요청한 극장만 주지 않는다.** `siteNo=0040`(압구정)으로
+  요청하면 씨네드쉐프 압구정(`P001`) 회차가 섞여 온다 → 응답 `siteNo`로 재필터 필수.
+- 로컬 래퍼는 launchd 대비 PATH를 고정하는데, macOS `md5`는 `/sbin`에 있어 안 잡힌다
+  → 해시는 `/usr/bin/cksum` 사용.
+- 셸에서 `$COUNT회` 는 변수명 `COUNT회`로 파싱된다(`set -u`에 걸려 사망) → `${COUNT}회`.
+
+> ⚠️ 티켓을 잡았으면 **워크플로우 파일 삭제 + `cgv-watch-setup.sh --remove`**.
 
 ## 3. 사용법
 

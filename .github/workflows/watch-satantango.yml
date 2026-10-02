@@ -1,0 +1,131 @@
+# 알람 전용 워크플로우 — 워크플로우 **이름이 곧 알림 메일 제목**이 된다.
+#   감지되면 잡을 의도적으로 실패시켜 GitHub 기본 실패 알림 메일을 알람으로 쓴다.
+#   메일 제목: "[mameil/cinemo] Run failed: 🎟 사탄탱고 CGV압구정 10/9 예매 오픈! - master (sha)"
+#   → 제목만 보고 바로 알 수 있고, 클릭해 들어가면 잡 Summary에 회차·잔여좌석이 보인다.
+#
+# 알람 조건 (watch-open.ts 종료코드 1)
+#   ⓐ CGV 압구정 10/9에 사탄탱고 회차가 떴다            ← 본래 목적
+#   ⓑ 10/9 예매는 열렸는데 사탄탱고 편성이 없다          ← 특별전 종료. 다른 날 노려야 함
+#
+# 중복 메일 방지: 알람을 한 번 보내면 actions/cache에 마커를 남기고 이후 조용히 통과한다.
+#   (캐시 키는 불변이라 "한 번만 저장"이 그대로 1회 발송 보장이 된다)
+#
+# ⚠️ 스케줄 워크플로우는 **기본 브랜치(master)에 있을 때만** 돌아간다.
+# ⚠️ 티켓을 잡았거나 10/9이 지나면 이 파일을 삭제할 것. (날짜가 지나면 알람은 자동으로 멈춘다)
+name: 🎟 사탄탱고 CGV압구정 10/9 예매 오픈!
+
+on:
+  schedule:
+    # 10분마다. GitHub 크론은 best-effort라 수 분~10분 지연될 수 있다.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: watch-satantango
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  WATCH_SITE: "0040" # CGV 압구정 (씨네드쉐프 압구정 P001과 다름)
+  WATCH_DATE: "2026-10-09"
+  WATCH_MOVIE: "사탄탱고"
+  ALERT_KEY: cgv-watch-alert-0040-20261009-satantango
+  ERROR_KEY: cgv-watch-error-0040-20261009-satantango
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # 이미 알람을 보냈는지 확인 (lookup-only — 받아올 내용은 없고 존재 여부만 본다)
+      - name: Check alert marker
+        id: alert_marker
+        uses: actions/cache/restore@v4
+        with:
+          path: .watch-marker
+          key: ${{ env.ALERT_KEY }}
+          lookup-only: true
+
+      - name: Already alerted — skip
+        if: steps.alert_marker.outputs.cache-hit == 'true'
+        run: echo "이미 알람을 보냈음 → 이번 실행은 통과. 다 끝났으면 이 워크플로우 파일을 삭제하세요."
+
+      - uses: actions/checkout@v4
+        if: steps.alert_marker.outputs.cache-hit != 'true'
+
+      - uses: pnpm/action-setup@v4
+        if: steps.alert_marker.outputs.cache-hit != 'true'
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        if: steps.alert_marker.outputs.cache-hit != 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        if: steps.alert_marker.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Install curl-impersonate (CGV Cloudflare 우회)
+        if: steps.alert_marker.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sL https://github.com/lexiforest/curl-impersonate/releases/download/v1.5.6/curl-impersonate-v1.5.6.x86_64-linux-gnu.tar.gz \
+            | tar -xz -C "$HOME/.local/bin" curl-impersonate
+          chmod +x "$HOME/.local/bin/curl-impersonate"
+
+      # 종료코드로 잡을 바로 죽이지 않고, outputs를 보고 마커 저장 → 실패 순서를 지킨다
+      - name: Watch booking open
+        id: watch
+        if: steps.alert_marker.outputs.cache-hit != 'true'
+        continue-on-error: true
+        run: pnpm --filter @cinemo/crawler cgv-watch
+        env:
+          CURL_IMPERSONATE_BIN: /home/runner/.local/bin/curl-impersonate
+
+      # ── 알람 경로 ──────────────────────────────────────
+      - name: Save alert marker (1회 발송 보장)
+        if: steps.watch.outputs.alert == 'true'
+        run: date -u +%FT%TZ > .watch-marker
+
+      - uses: actions/cache/save@v4
+        if: steps.watch.outputs.alert == 'true'
+        with:
+          path: .watch-marker
+          key: ${{ env.ALERT_KEY }}
+
+      - name: 🔔 알람 — 잡을 실패시켜 메일 발송
+        if: steps.watch.outputs.alert == 'true'
+        run: |
+          echo "::error title=예매 오픈 감지::위 Summary에서 회차를 확인하세요"
+          exit 1
+
+      # ── 장애 경로 (수집 실패) — 알람 마커와 별개로 1회만 알린다 ──
+      - name: Check error marker
+        id: error_marker
+        if: steps.watch.outputs.error == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: .watch-error-marker
+          key: ${{ env.ERROR_KEY }}
+          lookup-only: true
+
+      - name: Save error marker
+        if: steps.watch.outputs.error == 'true' && steps.error_marker.outputs.cache-hit != 'true'
+        run: date -u +%FT%TZ > .watch-error-marker
+
+      - uses: actions/cache/save@v4
+        if: steps.watch.outputs.error == 'true' && steps.error_marker.outputs.cache-hit != 'true'
+        with:
+          path: .watch-error-marker
+          key: ${{ env.ERROR_KEY }}
+
+      - name: ⚠️ 감시 자체가 깨졌음 — 1회만 알림
+        if: steps.watch.outputs.error == 'true' && steps.error_marker.outputs.cache-hit != 'true'
+        run: |
+          echo "::error title=감시 실패::CGV 수집이 실패했습니다. 로그를 확인하세요"
+          exit 1

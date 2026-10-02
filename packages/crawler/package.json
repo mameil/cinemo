@@ -16,7 +16,8 @@
     "tmdb": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/tmdb-sync.ts",
     "schedule": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/schedule-all.ts",
     "theater-geo": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/theater-geo.ts",
-    "insta": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/insta/index.ts"
+    "insta": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/insta/index.ts",
+    "cgv-watch": "DOTENV_CONFIG_PATH=../../.env tsx --require dotenv/config src/cgv/watch-open.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",
