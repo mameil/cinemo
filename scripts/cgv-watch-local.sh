@@ -3,7 +3,12 @@
 #
 # GitHub Actions(10분, 메일)와 이중화되는 고빈도 경로. 맥이 켜져 있는 동안만 돈다.
 # 감지되면 **알림센터 + 소리 + 음성 + 브라우저 열기** 네 겹으로 알려서 맥 앞에 있으면 못 놓친다.
-# (자리에 없을 때는 GH Actions 메일이 받아낸다 — 그래서 둘을 같이 돌린다)
+# 자리에 없을 때를 위해 **폰 푸시(ntfy)** 도 같이 보낸다 — GitHub 크론은 실측상 지연·폐기가
+# 심해서(3시간 크론이 3~45분씩 밀리고 절반은 버려짐) 원격 알림을 로컬이 직접 담당한다.
+#
+# 폰 푸시 설정: .env 에 WATCH_NTFY_TOPIC=<추측불가 토픽> 을 넣고, 폰에 ntfy 앱을 설치해
+# 같은 토픽을 구독한다. 토픽을 아는 사람은 누구나 구독 가능하므로 **커밋 금지**(.env는 gitignore).
+# 미설정이면 푸시만 조용히 건너뛰고 로컬 알림은 그대로 동작한다.
 #
 # 수동 실행:   sh scripts/cgv-watch-local.sh
 # 다른 대상:   WATCH_SITE=0013 WATCH_DATE=2026-10-11 WATCH_MOVIE=토리노의말 sh scripts/cgv-watch-local.sh
@@ -42,6 +47,28 @@ mkdir -p "$(dirname "$LOG")" "$STATE_DIR"
 
 ts() { date '+%Y-%m-%d %H:%M:%S'; }
 logln() { echo "$(ts) $*" >> "$LOG"; }
+
+# 폰 푸시 토픽 — env 우선, 없으면 .env에서 읽는다(프로젝트 관례상 키는 루트 .env)
+# 공백은 제거한다 — 공백만 든 값을 "설정됨"으로 보면 매 실행 HTTP 400을 맞는다
+NTFY_TOPIC=$(printf '%s' "${WATCH_NTFY_TOPIC:-}" | tr -d '[:space:]')
+if [ -z "$NTFY_TOPIC" ] && [ -f "$REPO_ROOT/.env" ]; then
+  NTFY_TOPIC=$(grep -m1 '^WATCH_NTFY_TOPIC=' "$REPO_ROOT/.env" 2>/dev/null \
+    | cut -d= -f2- | tr -d "\"'" | tr -d '[:space:]')
+fi
+
+# JSON 문자열 이스케이프 (제목·본문에 따옴표가 섞여도 깨지지 않게)
+json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+# 폰 푸시 — 헤더는 비ASCII에 취약하므로 UTF-8 안전한 JSON 발행 방식을 쓴다.
+# $1=제목 $2=본문 $3=우선순위(5=최대)
+push() {
+  [ -n "$NTFY_TOPIC" ] || return 0
+  _t=$(json_escape "$1"); _m=$(json_escape "$2")
+  _code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST "https://ntfy.sh" \
+    -H "Content-Type: application/json" \
+    -d "{\"topic\":\"$NTFY_TOPIC\",\"title\":\"$_t\",\"message\":\"$_m\",\"priority\":$3,\"tags\":[\"ticket\"],\"click\":\"https://cgv.co.kr\"}")
+  if [ "$_code" = "200" ]; then logln "  ntfy 푸시 OK"; else logln "  ntfy 푸시 실패 (HTTP $_code)"; fi
+}
 
 # macOS 알림 — 따옴표/백슬래시를 AppleScript 문자열로 이스케이프
 notify() {
@@ -87,6 +114,7 @@ if [ "$ERRORED" = "true" ] || { [ "$STATUS" -eq 2 ] && [ "$ALERT" != "true" ]; }
   if [ ! -f "$ERROR_MARKER" ]; then
     : > "$ERROR_MARKER"
     notify "⚠️ CGV 감시 실패" "$WATCH_MOVIE 감시가 깨졌습니다. 로그 확인: $LOG"
+    push "⚠️ CGV 감시 실패" "$WATCH_MOVIE $WATCH_DATE 감시가 깨졌습니다. 맥에서 로그 확인 필요." 3
     logln "수집 실패 (exit $STATUS) — 알림 1회 발송"
     cat "$RAW" >> "$LOG"
   else
@@ -116,6 +144,9 @@ else
 fi
 
 notify "$TITLE" "${DETAIL:-자세한 내용은 $LOG}"
+# 자리에 없어도 받도록 폰 푸시. ⓐ는 최대 우선순위(5·방해금지 모드 관통), ⓑ는 높음(4).
+[ "$FOUND" = "true" ] && PRIO=5 || PRIO=4
+push "$TITLE" "${DETAIL:-$WATCH_MOVIE $WATCH_DATE}" "$PRIO"
 # 소리를 놓쳐도 음성은 귀에 남는다 (알림 소리만으로는 자주 묻힌다)
 [ "$WATCH_VOICE" = "1" ] && say "$VOICE" 2>>"$LOG" &
 
