@@ -74,6 +74,14 @@ ALERT=$(grep -m1 '^alert=' "$OUT" 2>/dev/null | cut -d= -f2)
 FOUND=$(grep -m1 '^found=' "$OUT" 2>/dev/null | cut -d= -f2)
 ERRORED=$(grep -m1 '^error=' "$OUT" 2>/dev/null | cut -d= -f2)
 
+# 감시기가 결과를 한 줄도 못 썼다 = 실행 자체가 안 됐다.
+#   예: 이 워킹트리를 watch-open.ts 없는 브랜치로 바꿔둠 / 의존성 깨짐 / tsx 기동 실패.
+# 이걸 "대기"로 로깅하면 죽은 감시를 정상으로 오인한다(가장 나쁜 실패) — 장애로 올린다.
+if [ -z "$ALERT" ] && [ -z "$ERRORED" ]; then
+  ERRORED=true
+  logln "감시기가 결과를 쓰지 못함 — 실행 실패로 간주 (exit $STATUS)"
+fi
+
 # ── 수집 실패 — 1회만 알린다(1분마다 울리면 못 쓴다) ──
 if [ "$ERRORED" = "true" ] || { [ "$STATUS" -eq 2 ] && [ "$ALERT" != "true" ]; }; then
   if [ ! -f "$ERROR_MARKER" ]; then
