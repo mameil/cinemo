@@ -64,3 +64,6 @@ pnpm --filter @cinemo/crawler watch-agent -- remove dune-imax
   윈도우에선 lexiforest/curl-impersonate `x86_64-win32` 빌드를 받아 그 PC `.env`만 고칠 것.
 - **`pnpm` 스크립트의 `VAR=값 명령` 접두사는 윈도우에서 안 먹는다**(`cgv-watch`·`event-watch` CLI).
   윈도우에선 `watch-agent -- run <이름>`으로 확인할 것(접두사 없음).
+- **윈도우 기본 curl(Schannel)은 회사망에서 `CRYPT_E_NO_REVOCATION_CHECK`로 실패한다**(메가박스).
+  `--ssl-no-revoke`(윈도우에서만)로 폐기 확인만 건너뛴다. curl-impersonate·Node(ntfy)는 윈도우 인증서
+  저장소를 안 쓰므로 신뢰 루트를 PEM으로 내보내 `~/.cinemo/ca-bundle.pem`에 둔다(이관 때 65개).

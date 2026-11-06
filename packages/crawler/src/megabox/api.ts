@@ -55,6 +55,9 @@ function fetchHtml(
   // 재시도는 아래 JS 레벨 루프가 전담 — 한 curl 호출(≤25초)은 node timeout(30초) 안에 든다.
   // 셸 없이 인자 배열로 — 윈도우 cmd는 '…' 인용을 몰라 URL·JSON 본문이 깨진다(2026-11-06)
   const args = ["-s", "--max-time", "25", url, "-H", `User-Agent: ${USER_AGENT}`];
+  // 윈도우 기본 curl(Schannel)은 회사망 SSL 가로채기 인증서의 폐기 여부를 못 확인해 실패한다
+  // (CRYPT_E_NO_REVOCATION_CHECK). 체인 검증은 유지하고 폐기 확인만 건너뛴다. 맥·리눅스엔 없는 옵션.
+  if (process.platform === "win32") args.push("--ssl-no-revoke");
   if (method === "POST" && body) {
     args.push("-H", "Content-Type: application/json", "-d", JSON.stringify(body));
   }
