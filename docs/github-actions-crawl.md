@@ -115,9 +115,8 @@ env:
 > ("10/9 예매는 열렸으나 사탄탱고 편성 없음" = 특별전 종료 확인). GitHub Actions도
 > 실패 1건으로 같은 건을 잡았다(스케줄 32건 실행).
 > 로컬 7일 누적 **2,592회 실행 · 90초↑ 공백 0건 · 장애 0건**.
-> 감시 종료로 `watch-satantango.yml` 삭제. 감시기(`watch-open.ts`)와 로컬 스크립트
-> (`cgv-watch-local.sh`·`cgv-watch-setup.sh`)는 재사용 가능하게 남긴다 —
-> `WATCH_SITE/DATE/MOVIE` 만 바꿔 `sh scripts/cgv-watch-setup.sh` 재등록하면 된다.
+> 감시 종료로 `watch-satantango.yml` 삭제.
+> **현재 로컬 감시는 [local-watch.md](local-watch.md)** (2026-11 Node 실행기로 이관 — 아래 sh 래퍼 기록은 역사).
 
 **일회성 알람 전용.** 특정 극장·날짜·영화의 예매가 열리는 순간을 잡는다.
 데이터 적재와 무관해 DB도 시크릿도 쓰지 않는다 (`CURL_IMPERSONATE_BIN`만).
@@ -134,8 +133,8 @@ env:
 - 알람 조건 2개: ⓐ 해당 영화 회차 등장 ⓑ 날짜는 열렸는데 그 영화가 편성에 없음
   (ⓑ도 알리는 이유 — 특별전 종료를 모르고 계속 기다리는 게 최악)
 
-**로컬 1분 — 실질적인 주 경로** (`scripts/cgv-watch-local.sh` + `cgv-watch-setup.sh`)
-맥이 켜져 있을 때만 돈다. `sh scripts/cgv-watch-setup.sh` 등록 / `--remove` 해제.
+**로컬 1분 — 실질적인 주 경로** (당시 `scripts/cgv-watch-local.sh`, 2026-11 삭제 → [local-watch.md](local-watch.md))
+맥이 켜져 있을 때만 돌았다.
 감지 시 다섯 겹:
 
 1. macOS 알림센터 + 소리 2. 음성(`say`) 3. 브라우저 자동 오픈(첫 1회)
@@ -166,8 +165,7 @@ env:
   감시가 죽는데 로그엔 `대기 — 미오픈`이 찍혔다(죽은 걸 정상으로 오인 = 가장 나쁜 실패).
   → 감시기가 결과를 한 줄도 못 쓰면 장애로 올리도록 수정. 종료코드만 믿으면 안 된다.
 
-> ⚠️ 로컬 감시를 돌리는 동안엔 이 워킹트리를 `watch-open.ts` 있는 브랜치로 유지할 것.
-> ⚠️ 티켓을 잡았으면 **워크플로우 파일 삭제 + `cgv-watch-setup.sh --remove`**.
+> ⚠️ 로컬 감시를 돌리는 동안엔 이 워킹트리를 감시 코드가 있는 브랜치로 유지할 것.
 
 ## 3. 사용법
 

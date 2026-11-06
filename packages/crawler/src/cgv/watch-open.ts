@@ -2,16 +2,22 @@
  * CGV 예매 오픈 감시 (특정 극장 × 날짜 × 영화)
  *
  *   searchMovScnInfo를 폴링해 "아직 안 열린 날짜"에 지정 영화 회차가 나타나는 순간을 잡는다.
- *   GitHub Actions 크론이 돌리고, 감지되면 종료코드 1로 잡을 실패시켜
- *   GitHub 기본 실패 알림 메일을 알람으로 쓴다 (워크플로우 이름이 곧 메일 제목).
+ *   (GitHub Actions 크론 경로는 지연·폐기가 심해 2026-10 폐기 — 로컬 감시가 담당)
  *
  *   주의: siteNo=0040(압구정)으로 요청하면 씨네드쉐프 압구정(P001) 회차까지 섞여서 온다.
  *         반드시 응답의 siteNo로 다시 걸러야 한다.
  *
  *   pnpm --filter @cinemo/crawler cgv-watch -- --site=0040 --date=2026-10-09 --movie=사탄탱고
+ *   pnpm --filter @cinemo/crawler cgv-watch -- --site=0059 --date=2026-12-15..2026-12-20 --movie=듄 --format=IMAX
  *
- *   로컬(맥)에서는 scripts/cgv-watch-local.sh 가 이 스크립트를 1분마다 돌리고,
- *   WATCH_OUT / WATCH_SUMMARY 로 결과를 받아 macOS 알림·음성·브라우저로 알린다.
+ *   --date=A..B  날짜 범위(양끝 포함, 지난 날짜는 건너뜀). 범위 중 하나라도 회차가 뜨면 알람.
+ *   --format=X   상영 포맷(movkndDsplNm) 부분일치 필터 — "IMAX관"에서 일반 2D를 트는 경우가 있어
+ *                (예: "최종면접(non-IMAX)") 관 이름이 아니라 포맷으로 판별한다.
+ *   범위·포맷 중 하나라도 지정하면 ⓑ(날짜는 열렸는데 영화 없음) 알람은 끈다 —
+ *   대형 극장은 날짜만 열리면 다른 영화로 차서 매번 오탐이 나기 때문. ⓐ만 알린다.
+ *
+ *   로컬 상시 감시는 src/watch/run.ts 가 checkOpen()을 직접 불러 ntfy 폰 푸시로 알린다
+ *   (등록: pnpm --filter @cinemo/crawler watch-agent -- add ...).
  *
  * 종료코드
  *   0 — 아직 미오픈. 대기 (알람 없음)
@@ -44,6 +50,22 @@ function todayKst(): string {
   return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 }
 
+/** "A" 또는 "A..B" → [A..B] 날짜 목록 (YYYY-MM-DD, 양끝 포함). 형식 오류면 null */
+const MAX_RANGE_DAYS = 14; // 1회 실행 요청 수 상한 — Cloudflare 차단 회피
+function expandDates(spec: string): string[] | null {
+  const [from, to = from] = spec.split("..");
+  const re = /^\d{4}-\d{2}-\d{2}$/;
+  if (!re.test(from) || !re.test(to) || to < from) return null;
+  const dates: string[] = [];
+  for (let d = new Date(`${from}T00:00:00Z`); ; d = new Date(d.getTime() + 864e5)) {
+    const ymd = d.toISOString().slice(0, 10);
+    if (ymd > to) break;
+    dates.push(ymd);
+    if (dates.length > MAX_RANGE_DAYS) return null;
+  }
+  return dates;
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -71,6 +93,8 @@ export interface WatchOptions {
   date: string;
   /** 영화 제목 (정규화 후 부분일치) */
   movie: string;
+  /** 상영 포맷 부분일치 (예: IMAX). 없으면 포맷 무관 */
+  format?: string;
 }
 
 export interface WatchResult {
@@ -88,7 +112,12 @@ export async function watchOpen(opts: WatchOptions): Promise<WatchResult> {
   const items = await fetchWithRetry(opts.siteNo, ymd);
   // 요청 극장 외(씨네드쉐프 등) 회차가 섞여 오므로 응답 siteNo로 재필터
   const siteItems = items.filter((i) => i.siteNo === opts.siteNo);
-  const hits = siteItems.filter((i) => normalizeTitle(i.movNm).includes(key));
+  const fmt = opts.format?.toLowerCase();
+  const hits = siteItems.filter(
+    (i) =>
+      normalizeTitle(i.movNm).includes(key) &&
+      (!fmt || (i.movkndDsplNm ?? "").toLowerCase().includes(fmt))
+  );
 
   return { siteItems, hits };
 }
@@ -102,7 +131,7 @@ function formatItem(i: CgvScnItem): string {
 /**
  * 사람이 읽을 결과 요약(마크다운) 기록.
  *   GITHUB_STEP_SUMMARY — Actions 잡 요약 (실패 메일에서 클릭해 들어오면 바로 보인다)
- *   WATCH_SUMMARY       — 로컬 래퍼(scripts/cgv-watch-local.sh)가 알림 본문으로 쓴다
+ *   WATCH_SUMMARY       — CLI 호출자가 결과 본문을 받아 쓸 때
  */
 function writeSummary(lines: string[]): void {
   const body = lines.join("\n") + "\n";
@@ -114,7 +143,7 @@ function writeSummary(lines: string[]): void {
 /**
  * key=value 기계용 출력. 호출자가 알람 발송/마커 저장 여부를 이걸로 판단한다.
  *   GITHUB_OUTPUT — Actions 후속 스텝용
- *   WATCH_OUT     — 로컬 래퍼용 (종료코드만으로는 ⓐ/ⓑ 구분이 안 되므로 필요)
+ *   WATCH_OUT     — CLI 호출자용 (종료코드만으로는 ⓐ/ⓑ 구분이 안 되므로 필요)
  */
 function writeOutput(key: string, value: string): void {
   const line = `${key}=${value}\n`;
@@ -128,85 +157,122 @@ function arg(args: string[], name: string): string | undefined {
   return found?.slice(name.length + 3);
 }
 
-async function main(): Promise<number> {
-  const args = process.argv.slice(2).filter((a) => a !== "--");
-  const siteNo = arg(args, "site") ?? process.env.WATCH_SITE;
-  const date = arg(args, "date") ?? process.env.WATCH_DATE;
-  const movie = arg(args, "movie") ?? process.env.WATCH_MOVIE;
+export interface OpenCheckParams {
+  siteNo: string;
+  /** "YYYY-MM-DD" 또는 "YYYY-MM-DD..YYYY-MM-DD" */
+  dateSpec: string;
+  movie: string;
+  format?: string;
+}
 
-  if (!siteNo || !date || !movie) {
-    console.error(
-      "사용법: cgv-watch -- --site=0040 --date=2026-10-09 --movie=사탄탱고\n" +
-        "        (환경변수 WATCH_SITE / WATCH_DATE / WATCH_MOVIE 로도 지정 가능)"
+/**
+ * 감시 1회 판정 결과 — CLI(main)와 로컬 실행기(watch/run.ts)가 공유한다.
+ *   expired              감시 날짜가 전부 지남
+ *   wait                 아직 미오픈
+ *   found                ⓐ 해당 영화(·포맷) 회차 등장
+ *   opened_without_movie ⓑ 날짜는 열렸는데 영화 없음 (단일 날짜·포맷 미지정 모드에서만)
+ * 수집 실패는 예외로 던진다.
+ */
+export interface OpenCheckResult {
+  status: "expired" | "wait" | "found" | "opened_without_movie";
+  /** "듄 IMAX" 처럼 영화+포맷 */
+  label: string;
+  /** 알림 한 줄 요약 */
+  headline: string;
+  /** 회차(ⓐ) 또는 편성 작품(ⓑ) 목록 */
+  lines: string[];
+  siteName?: string;
+}
+
+const md = (ymd: string): string => `${ymd.slice(4, 6)}/${ymd.slice(6, 8)}`;
+
+export async function checkOpen(p: OpenCheckParams): Promise<OpenCheckResult> {
+  const allDates = expandDates(p.dateSpec);
+  if (!allDates) {
+    throw new Error(
+      `날짜 형식 오류: ${p.dateSpec} (YYYY-MM-DD 또는 YYYY-MM-DD..YYYY-MM-DD, 최대 ${MAX_RANGE_DAYS}일)`
     );
-    return 2;
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    console.error(`--date 형식 오류: ${date} (YYYY-MM-DD)`);
-    return 2;
-  }
+  const format = p.format?.trim() || undefined;
+  const label = format ? `${p.movie} ${format}` : p.movie;
 
-  const today = todayKst();
-  console.log("=== CGV 예매 오픈 감시 ===");
-  console.log(`극장 siteNo=${siteNo} · 날짜 ${date} · 영화 "${movie}" · 오늘(KST) ${today}`);
-
-  // 감시 날짜가 지났으면 알람 의미가 없다 — 크론을 못 지운 채로 돌아도 조용히 통과
-  if (date < today) {
-    console.log("감시 날짜가 이미 지남 → 종료 (크론 제거 권장)");
-    writeOutput("alert", "false");
-    writeOutput("expired", "true");
-    return 0;
+  // 감시 날짜가 전부 지났으면 알람 의미가 없다 — 등록을 못 지운 채로 돌아도 조용히 통과
+  const dates = allDates.filter((d) => d >= todayKst());
+  if (dates.length === 0) {
+    return { status: "expired", label, headline: "감시 날짜가 이미 지남", lines: [] };
   }
 
-  const { siteItems, hits } = await watchOpen({ siteNo, date, movie });
-  console.log(`해당 극장 ${date} 회차: ${siteItems.length}건`);
+  const hits: CgvScnItem[] = [];
+  const openDates: string[] = [];
+  let lastSiteItems: CgvScnItem[] = [];
+  for (const date of dates) {
+    const r = await watchOpen({ siteNo: p.siteNo, date, movie: p.movie, format });
+    if (r.siteItems.length > 0) openDates.push(date);
+    lastSiteItems = r.siteItems;
+    hits.push(...r.hits);
+    if (dates.length > 1) await sleep(300); // 연속 요청 간격 — Cloudflare 순간 차단 회피
+  }
 
   // ⓐ 영화 감지 — 본래 목적
   if (hits.length > 0) {
-    const lines = hits.map(formatItem);
-    console.log(`\n★★★ "${movie}" ${date} 예매 오픈 감지 — ${hits.length}회차 ★★★`);
-    for (const l of lines) console.log(`  ${l}`);
-
-    writeOutput("alert", "true");
-    writeOutput("found", "true");
-    writeSummary([
-      `## 🎟 "${movie}" ${date} 예매 오픈`,
-      "",
-      `**${hits[0].siteNm}** · ${hits.length}회차`,
-      "",
-      ...lines.map((l) => `- ${l}`),
-      "",
-      "[CGV 바로가기](https://cgv.co.kr)",
-    ]);
-    return 1;
+    const hitDates = [...new Set(hits.map((i) => md(i.scnYmd)))].join("·");
+    return {
+      status: "found",
+      label,
+      headline: `${hitDates} ${hits.length}회차`,
+      lines: hits.map((i) => `${md(i.scnYmd)} ${formatItem(i)}`),
+      siteName: hits[0].siteNm,
+    };
   }
 
-  // 아직 날짜 자체가 안 열림 — 정상 대기
-  if (siteItems.length === 0) {
-    console.log(`→ ${date}은 아직 예매 미오픈 (회차 0건). 대기.`);
-    writeOutput("alert", "false");
-    return 0;
+  // ⓑ는 단일 날짜·포맷 미지정 모드에서만 (대형 극장 범위·포맷 감시는 매번 오탐 — 파일 머리 주석)
+  const isSimpleMode = allDates.length === 1 && !format;
+  if (!isSimpleMode || openDates.length === 0) {
+    const range = dates.length > 1 ? `${dates[0]}..${dates[dates.length - 1]}` : dates[0];
+    const opened = openDates.length ? `열린 날짜 ${openDates.join(", ")}` : "열린 날짜 없음";
+    return { status: "wait", label, headline: `${range} 미오픈 (${opened})`, lines: [] };
   }
 
-  // ⓑ 날짜는 열렸는데 그 영화가 없음 — 특별전 종료 가능성, 사람 판단 필요
-  const titles = [...new Set(siteItems.map((i) => i.movNm))];
-  console.log(`\n⚠️  ${date} 예매는 열렸으나 "${movie}" 편성 없음. 편성 목록:`);
-  for (const t of titles) console.log(`     - ${t}`);
+  const titles = [...new Set(lastSiteItems.map((i) => i.movNm.trim()))];
+  return {
+    status: "opened_without_movie",
+    label,
+    headline: `${dates[0]} 예매는 열렸지만 "${p.movie}" 편성 없음`,
+    lines: titles,
+    siteName: lastSiteItems[0].siteNm,
+  };
+}
 
-  writeOutput("alert", "true");
-  writeOutput("opened_without_movie", "true");
-  writeSummary([
-    `## ⚠️ ${date} 예매는 열렸지만 "${movie}" 편성 없음`,
-    "",
-    `**${siteItems[0].siteNm}** · 총 ${siteItems.length}회차 / ${titles.length}개 작품`,
-    "",
-    "해당 날짜 편성:",
-    "",
-    ...titles.map((t) => `- ${t}`),
-    "",
-    `"${movie}" 를 볼 다른 날짜를 찾아야 합니다.`,
-  ]);
-  return 1;
+/** CLI — 사람이 직접 돌려 볼 때. 종료코드 0=대기 1=주목 2=실패 */
+async function main(): Promise<number> {
+  const args = process.argv.slice(2).filter((a) => a !== "--");
+  const siteNo = arg(args, "site") ?? process.env.WATCH_SITE;
+  const dateSpec = arg(args, "date") ?? process.env.WATCH_DATE;
+  const movie = arg(args, "movie") ?? process.env.WATCH_MOVIE;
+  const format = arg(args, "format") ?? process.env.WATCH_FORMAT;
+
+  if (!siteNo || !dateSpec || !movie) {
+    console.error(
+      "사용법: cgv-watch -- --site=0040 --date=2026-10-09 --movie=사탄탱고 [--format=IMAX]\n" +
+        "        --date=2026-12-15..2026-12-20 처럼 범위도 가능"
+    );
+    return 2;
+  }
+
+  console.log("=== CGV 예매 오픈 감시 ===");
+  console.log(`극장 siteNo=${siteNo} · 날짜 ${dateSpec} · 영화 "${movie}${format ? " " + format : ""}" · 오늘(KST) ${todayKst()}`);
+  const r = await checkOpen({ siteNo, dateSpec, movie, format });
+  console.log(`→ [${r.status}] ${r.headline}`);
+  for (const l of r.lines) console.log(`  ${l}`);
+
+  writeOutput("alert", String(r.status === "found" || r.status === "opened_without_movie"));
+  if (r.status === "expired") writeOutput("expired", "true");
+  if (r.status === "found") writeOutput("found", "true");
+  if (r.status === "opened_without_movie") writeOutput("opened_without_movie", "true");
+  if (r.lines.length > 0) {
+    writeSummary([`## ${r.label} — ${r.headline}`, "", `**${r.siteName ?? ""}**`, "", ...r.lines.map((l) => `- ${l}`)]);
+  }
+  return r.status === "found" || r.status === "opened_without_movie" ? 1 : 0;
 }
 
 if (require.main === module) {

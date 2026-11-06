@@ -262,3 +262,23 @@ export async function fetchScreenSchedule(
   return fetchJson<CgvScnItem[]>(url);
 }
 
+/** 좌석 한 칸 (searchIfSeatData) */
+export interface CgvSeat {
+  seatRowNm: string; // 행 (예: "C")
+  seatNo: string; // 번호 (예: "6")
+  seatSaleYn: string; // "Y" = 판매 가능(빈자리)
+}
+
+/** 특정 회차 좌석 배치 — 좌석 감시(watch/run.ts seat)용 */
+export async function fetchSeatMap(
+  siteNo: string,
+  scnYmd: string,
+  scnsNo: string,
+  scnSseq: string
+): Promise<CgvSeat[]> {
+  const url = `${SCHEDULE_BASE}/searchIfSeatData?coCd=${CO_CD}&siteNo=${siteNo}&scnYmd=${scnYmd}&scnsNo=${scnsNo}&scnSseq=${scnSseq}&seatAreaNo=001`;
+  const data = await fetchJson<{ items?: { seats?: CgvSeat[] }[] }>(url);
+  const seats = data.items?.[0]?.seats;
+  if (!seats) throw new Error("좌석 응답에 items[0].seats 없음");
+  return seats;
+}
