@@ -107,7 +107,8 @@ export function buildConfig(
     case "event": {
       const match = req(kv, "match");
       new RegExp(match, "i"); // 정규식 오류면 여기서 던진다
-      const chains = (kv.chains ?? "cgv,megabox").split(",").map((c) => c.trim()).filter(Boolean);
+      // 쉼표·공백 모두 구분자 — PowerShell은 따옴표 없는 a,b 를 배열로 보고 "a b"로 넘긴다
+      const chains = (kv.chains ?? "cgv,megabox").split(/[\s,]+/).filter(Boolean);
       return { ...base, kind, params: { match, chains } };
     }
     case "seat": {
