@@ -7,7 +7,7 @@
  * - 굿즈 소진현황: www.megabox.co.kr/on/oh/ohe/Event/selectGoodsStockPrco.do (POST, HTML 응답)
  */
 
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import * as cheerio from "cheerio";
 
 const BASE_URL = "https://www.megabox.co.kr";
@@ -50,19 +50,20 @@ function fetchHtml(
   body?: object
 ): string {
   // curl 자체 재시도(--retry)는 쓰지 않는다: --retry 3 × --max-time 25 = 최악 ~79초가
-  // 한 번의 execSync 안에서 돌아 node timeout(30초)이 /bin/sh를 강제 종료 →
+  // 한 번의 curl 호출 안에서 돌아 node timeout(30초)이 /bin/sh를 강제 종료 →
   // `spawnSync ETIMEDOUT`으로 메가박스 단계가 간헐 실패했다 (2026-08-06).
   // 재시도는 아래 JS 레벨 루프가 전담 — 한 curl 호출(≤25초)은 node timeout(30초) 안에 든다.
-  let cmd = `curl -s --max-time 25 '${url}' -H 'User-Agent: ${USER_AGENT}'`;
+  // 셸 없이 인자 배열로 — 윈도우 cmd는 '…' 인용을 몰라 URL·JSON 본문이 깨진다(2026-11-06)
+  const args = ["-s", "--max-time", "25", url, "-H", `User-Agent: ${USER_AGENT}`];
   if (method === "POST" && body) {
-    cmd += ` -H 'Content-Type: application/json' -d '${JSON.stringify(body)}'`;
+    args.push("-H", "Content-Type: application/json", "-d", JSON.stringify(body));
   }
 
   // JS 레벨 재시도: 일시적 실패/빈 응답에 견디도록 (CI 대량요청 대비)
   let lastErr: unknown;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const result = execSync(cmd, {
+      const result = execFileSync("curl", args, {
         encoding: "utf-8",
         timeout: 30000,
         maxBuffer: 32 * 1024 * 1024,

@@ -15,7 +15,7 @@
  */
 
 import { createHmac } from "crypto";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { homedir } from "os";
 
 const EVENT_BASE = "https://cgv.co.kr/api/v1/content/event";
@@ -26,7 +26,8 @@ const HMAC_KEY = "ydqXY0ocnFLmJGHr_zNzFcpjwAsXq_8JcBNURAkRscg";
 // Chrome을 흉내내는 curl-impersonate 바이너리를 사용한다.
 // 설치: GitHub lexiforest/curl-impersonate 릴리스 → ~/.local/bin/curl-impersonate
 const CURL_BIN =
-  process.env.CURL_IMPERSONATE_BIN || `${homedir()}/.local/bin/curl-impersonate`;
+  process.env.CURL_IMPERSONATE_BIN ||
+  `${homedir()}/.local/bin/curl-impersonate${process.platform === "win32" ? ".exe" : ""}`;
 
 // Chrome 131 TLS 지문 파라미터 (curl-impersonate의 curl_chrome131 래퍼에서 추출)
 const CHROME_CIPHERS =
@@ -123,19 +124,24 @@ async function fetchJson<T>(url: string): Promise<T> {
       // curl 자체 재시도(--retry)는 쓰지 않는다 — --retry × --max-time 25가 쌓이면
       // node timeout(30초)을 넘겨 spawnSync ETIMEDOUT을 유발한다(메가박스와 동일 이슈, 2026-08-06).
       // 재시도는 아래 for 루프(3회)가 전담하고, 한 curl 호출(≤25초)은 node timeout 안에 든다.
-      const result = execSync(
-        `'${CURL_BIN}' -s --max-time 25 '${url}' ` +
-          `--ciphers ${CHROME_CIPHERS} ` +
-          `--curves ${CHROME_CURVES} ` +
-          `-H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' ` +
-          `-H 'sec-ch-ua: "Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"' ` +
-          `-H 'sec-ch-ua-mobile: ?0' ` +
-          `-H 'sec-ch-ua-platform: "macOS"' ` +
-          `-H 'Origin: https://cgv.co.kr' ` +
-          `-H 'Referer: https://cgv.co.kr/' ` +
-          `-H 'Accept: application/json, text/plain, */*' ` +
-          `-H 'x-timestamp: ${sig["x-timestamp"]}' ` +
-          `-H 'x-signature: ${sig["x-signature"]}'`,
+      // 셸을 거치지 않고 인자 배열로 넘긴다 — 윈도우 cmd는 '…' 인용을 모르고 URL의 &를
+      // 명령 구분자로 읽어 깨진다(2026-11-06 윈도우 감시 이관 때 실측).
+      const result = execFileSync(
+        CURL_BIN,
+        [
+          "-s", "--max-time", "25", url,
+          "--ciphers", CHROME_CIPHERS,
+          "--curves", CHROME_CURVES,
+          "-H", "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          "-H", 'sec-ch-ua: "Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+          "-H", "sec-ch-ua-mobile: ?0",
+          "-H", 'sec-ch-ua-platform: "macOS"',
+          "-H", "Origin: https://cgv.co.kr",
+          "-H", "Referer: https://cgv.co.kr/",
+          "-H", "Accept: application/json, text/plain, */*",
+          "-H", `x-timestamp: ${sig["x-timestamp"]}`,
+          "-H", `x-signature: ${sig["x-signature"]}`,
+        ],
         { encoding: "utf-8", timeout: 30000, maxBuffer: 32 * 1024 * 1024 }
       );
       const json = JSON.parse(result);

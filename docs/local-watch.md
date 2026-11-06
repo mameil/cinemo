@@ -55,3 +55,12 @@ pnpm --filter @cinemo/crawler watch-agent -- remove dune-imax
   (exit 126, 2026-11-04). node는 허용돼 있다.
 - **윈도우**: 작업 `cinemo-watch-<이름>` (`schtasks /sc minute`) → `conhost.exe --headless scripts\watch-run.cmd <이름>`
   (창 안 뜸). 로그온 세션에서 돈다(인스타 배치와 같은 방식). node 기동 실패는 `%LOCALAPPDATA%\cinemo-watch.err.log`.
+
+## 함정 기록
+
+- **윈도우에서 curl을 셸 문자열로 부르면 깨진다.** cmd는 `'…'` 인용을 모르고 URL의 `&`를 명령 구분자로
+  읽는다(`'scnYmd' is not recognized…`). CGV·메가박스 API 클라이언트는 `execFileSync` 인자 배열로 호출한다.
+- **`.env`를 다른 PC에서 복사해 오면 `CURL_IMPERSONATE_BIN`이 그 PC 경로**(예: 맥 `/Users/…`)다.
+  윈도우에선 lexiforest/curl-impersonate `x86_64-win32` 빌드를 받아 그 PC `.env`만 고칠 것.
+- **`pnpm` 스크립트의 `VAR=값 명령` 접두사는 윈도우에서 안 먹는다**(`cgv-watch`·`event-watch` CLI).
+  윈도우에선 `watch-agent -- run <이름>`으로 확인할 것(접두사 없음).
