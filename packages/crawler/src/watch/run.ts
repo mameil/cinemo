@@ -170,6 +170,16 @@ async function runOnce(ctx: Ctx): Promise<void> {
   }
 }
 
+/** 알림 경로 점검 — 감시 판정 없이 그 감시의 토픽·CA로 테스트 푸시 1건 (agent test) */
+export async function sendTestPush(name: string): Promise<void> {
+  applyCaBundle();
+  const cfg = loadConfig(name);
+  const log = makeLogger(name);
+  const label = displayLabel(cfg);
+  log("테스트 푸시 발송");
+  await makePush(cfg.kind, log)(`🔔 [테스트] ${label}`, `${cfg.kind} 감시 알림 경로 점검입니다. 이 알림이 보이면 정상.`, 3);
+}
+
 export async function runWatch(name: string): Promise<void> {
   loadDotenv({ path: join(REPO_ROOT, ".env"), quiet: true }); // CURL_IMPERSONATE_BIN 등
   applyCaBundle();

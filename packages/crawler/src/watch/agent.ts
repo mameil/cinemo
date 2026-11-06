@@ -5,6 +5,7 @@
  *   pnpm --filter @cinemo/crawler watch-agent -- add <이름> <open|event|seat> <주기초> key=value ...
  *   pnpm --filter @cinemo/crawler watch-agent -- remove <이름>
  *   pnpm --filter @cinemo/crawler watch-agent -- run <이름>        (스케줄러 없이 1회 실행)
+ *   pnpm --filter @cinemo/crawler watch-agent -- test <이름>       (테스트 푸시 1건 — 알림 경로 점검)
  *
  * 예) CGV 영등포 듄 IMAX 예매 오픈 — 2분
  *   add dune-imax open 120 site=0059 date=2026-12-15..2026-12-20 movie=듄 format=IMAX
@@ -37,7 +38,7 @@ import {
   type WatchConfig,
 } from "./config";
 import { LOG_PATH } from "./runtime";
-import { runWatch } from "./run";
+import { runWatch, sendTestPush } from "./run";
 
 const REPO_ROOT = resolve(__dirname, "../../../..");
 const RUN_TS = join(REPO_ROOT, "packages", "crawler", "src", "watch", "run.ts");
@@ -221,8 +222,11 @@ async function main(): Promise<void> {
       if (!rest[0]) throw new Error("사용법: run <이름>");
       loadConfig(rest[0]); // 없으면 여기서 에러
       return runWatch(rest[0]);
+    case "test":
+      if (!rest[0]) throw new Error("사용법: test <이름>");
+      return sendTestPush(rest[0]);
     default:
-      console.error("사용법: watch-agent -- <list | add | remove | run> ... (src/watch/agent.ts 머리 주석 참고)");
+      console.error("사용법: watch-agent -- <list | add | remove | run | test> ... (src/watch/agent.ts 머리 주석 참고)");
       process.exit(2);
   }
 }

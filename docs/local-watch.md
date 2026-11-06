@@ -18,6 +18,7 @@ pnpm --filter @cinemo/crawler watch-agent -- add dune-imax open 120 site=0059 da
 pnpm --filter @cinemo/crawler watch-agent -- add lookback event 300 'match=룩백|look ?back' chains=megabox label=룩백 expire=20261201
 pnpm --filter @cinemo/crawler watch-agent -- add hateful8 seat 60 site=0054 ymd=20261105 scns=001 sseq=4 'targets=C6 C7' end=202611051715
 pnpm --filter @cinemo/crawler watch-agent -- run dune-imax     # 스케줄러 없이 1회
+pnpm --filter @cinemo/crawler watch-agent -- test dune-imax    # 테스트 푸시 1건 (토픽·CA 경로 점검)
 pnpm --filter @cinemo/crawler watch-agent -- remove dune-imax
 ```
 
