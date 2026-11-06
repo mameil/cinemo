@@ -205,6 +205,7 @@ export function buildImageUrl(path: string, filename: string): string {
 // ── 상영시간표 API (api.cgv.co.kr) ────────────────
 
 const API_BASE = "https://api.cgv.co.kr";
+const SCHEDULE_BASE = "https://cgv.co.kr/api/v1/booking";
 
 /** 극장 (지역+극장 목록) */
 export interface CgvSite {
@@ -254,6 +255,10 @@ export async function fetchScreenSchedule(
   siteNo: string,
   scnYmd: string
 ): Promise<CgvScnItem[]> {
-  const url = `${API_BASE}/cnm/atkt/searchMovScnInfo?coCd=${CO_CD}&siteNo=${siteNo}&scnYmd=${scnYmd}&rtctlScopCd=1`;
+  // 2026-11: 구 api.cgv.co.kr/cnm/atkt/searchMovScnInfo 가 403 HTML(errorPage mets01081)로 막혔다
+  //   (그동안 CGV 상영 크롤이 예외를 극장별로 삼켜 "상영 0건"으로 조용히 성공 처리됨).
+  //   신 게이트웨이 cgv.co.kr/api/v1/booking 이 /cnm/atkt 로 매핑되며 응답 필드는 동일.
+  const url = `${SCHEDULE_BASE}/searchMovScnInfo?coCd=${CO_CD}&siteNo=${siteNo}&scnYmd=${scnYmd}&rtctlScopCd=1`;
   return fetchJson<CgvScnItem[]>(url);
 }
+
