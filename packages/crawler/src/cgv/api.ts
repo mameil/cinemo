@@ -25,9 +25,14 @@ const HMAC_KEY = "ydqXY0ocnFLmJGHr_zNzFcpjwAsXq_8JcBNURAkRscg";
 // Cloudflare가 일반 curl의 TLS 지문(JA3)을 403으로 차단하므로,
 // Chrome을 흉내내는 curl-impersonate 바이너리를 사용한다.
 // 설치: GitHub lexiforest/curl-impersonate 릴리스 → ~/.local/bin/curl-impersonate
-const CURL_BIN =
-  process.env.CURL_IMPERSONATE_BIN ||
-  `${homedir()}/.local/bin/curl-impersonate${process.platform === "win32" ? ".exe" : ""}`;
+// 호출 시점에 읽는다 — import 시점에 읽으면 나중에 .env를 로드하는 호출자(watch/run.ts)에서
+// 설정이 무시되고 기본 경로로 떨어진다(맥은 기본 경로라 우연히 통과, 윈도우에서 드러남).
+function curlBin(): string {
+  return (
+    process.env.CURL_IMPERSONATE_BIN ||
+    `${homedir()}/.local/bin/curl-impersonate${process.platform === "win32" ? ".exe" : ""}`
+  );
+}
 
 // Chrome 131 TLS 지문 파라미터 (curl-impersonate의 curl_chrome131 래퍼에서 추출)
 const CHROME_CIPHERS =
@@ -127,7 +132,7 @@ async function fetchJson<T>(url: string): Promise<T> {
       // 셸을 거치지 않고 인자 배열로 넘긴다 — 윈도우 cmd는 '…' 인용을 모르고 URL의 &를
       // 명령 구분자로 읽어 깨진다(2026-11-06 윈도우 감시 이관 때 실측).
       const result = execFileSync(
-        CURL_BIN,
+        curlBin(),
         [
           "-s", "--max-time", "25", url,
           "--ciphers", CHROME_CIPHERS,
