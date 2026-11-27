@@ -18,6 +18,7 @@ import { fetchSeatMap } from "../cgv/api";
 import { checkOpen } from "../cgv/watch-open";
 import { checkEvents } from "../watch-event";
 import { displayLabel, loadConfig, stateDir, type WatchConfig } from "./config";
+import { freeAdjacentGroups, seatId } from "./seat-groups";
 import {
   applyCaBundle,
   makeLogger,
@@ -48,8 +49,12 @@ interface Ctx {
   push: (title: string, message: string, priority: number, click?: string) => Promise<void>;
 }
 
-function makePush(kind: string, log: Log): Ctx["push"] {
+function makePush(kind: string, log: Log, isDry = false): Ctx["push"] {
   return async (title, message, priority, click = CGV_URL) => {
+    if (isDry) {
+      log(`  [dry] 푸시 생략 — ${title} / ${message.replace(/\n/g, " ")}`);
+      return;
+    }
     const topic = ntfyTopic(kind);
     if (!topic) {
       log("  ntfy 토픽 없음(~/.cinemo/ntfy-topic) — 푸시 생략");
@@ -136,27 +141,29 @@ async function runSeat(ctx: Ctx & { cfg: Extract<WatchConfig, { kind: "seat" }> 
     return;
   }
   const seats = await fetchSeatMap(p.site, p.ymd, p.scns, p.sseq);
-  const id = (s: { seatRowNm: string; seatNo: string }) => s.seatRowNm + s.seatNo;
-  const missing = p.targets.filter((t) => !seats.some((s) => id(s) === t));
+  const missing = p.targets.filter((t) => !seats.some((s) => seatId(s) === t));
   if (missing.length > 0) throw new Error(`대상 좌석이 응답에 없음: ${missing.join(" ")}`);
   await trackFailure(ctx, "all", false, "");
 
-  const avail = seats
-    .filter((s) => p.targets.includes(id(s)) && s.seatSaleYn === "Y")
-    .map(id)
-    .sort();
-  const lastFile = join(ctx.dir, "last-avail");
+  const picked = seats.filter((s) => p.targets.includes(seatId(s)));
+  // 알림 단위: 연석 모드면 "L13-L14" 묶음, 아니면 빈 자리 하나하나
+  const avail = p.adjacent
+    ? freeAdjacentGroups(picked, p.adjacent)
+    : picked.filter((s) => s.seatSaleYn === "Y").map(seatId).sort();
+  const what = p.adjacent ? `연석${p.adjacent}` : "빈 좌석";
+  // 모드마다 파일을 따로 — 재등록 없이 설정만 바꿔도 단위가 섞이지 않게
+  const lastFile = join(ctx.dir, p.adjacent ? "last-groups" : "last-avail");
   const prev = readText(lastFile).split(" ").filter(Boolean);
   writeText(lastFile, avail.join(" "));
 
-  // 직전엔 없었는데 새로 빈 좌석만 알린다 — 같은 자리로 매번 울리지 않게
+  // 직전엔 없었는데 새로 생긴 것만 알린다 — 같은 자리로 매번 울리지 않게
   const fresh = avail.filter((s) => !prev.includes(s));
   if (fresh.length === 0) {
-    ctx.log(`대기 — 빈 좌석: ${avail.join(" ") || "없음"}`);
+    ctx.log(`대기 — ${what}: ${avail.join(" ") || "없음"}`);
     return;
   }
-  ctx.log(`★ 새로 빈 좌석: ${fresh.join(" ")}`);
-  await ctx.push(`🎟 좌석 났다: ${fresh.join(" ")}`, `${ctx.label} · 지금 빈 자리: ${avail.join(" ")}`, 5);
+  ctx.log(`★ 새 ${what}: ${fresh.join(" ")}`);
+  await ctx.push(`🎟 ${p.adjacent ? "연석" : "좌석"} 났다: ${fresh.join(" ")}`, `${ctx.label} · 지금 ${what}: ${avail.join(" ")}`, 5);
 }
 
 async function runOnce(ctx: Ctx): Promise<void> {
@@ -186,7 +193,7 @@ export async function runWatch(name: string): Promise<void> {
 
   const cfg = loadConfig(name);
   const log = makeLogger(name);
-  const ctx: Ctx = { cfg, label: displayLabel(cfg), dir: stateDir(name), log, push: makePush(cfg.kind, log) };
+  const ctx: Ctx = { cfg, label: displayLabel(cfg), dir: stateDir(name), log, push: makePush(cfg.kind, log, cfg.dry) };
 
   if (cfg.expire && nowKst().ymd >= cfg.expire) {
     log(`감시 기한(${cfg.expire}) 지남 — 통과 (해제 권장)`);

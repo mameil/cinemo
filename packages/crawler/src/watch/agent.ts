@@ -14,7 +14,10 @@
  * 예) CGV 좌석 — 1분
  *   add hateful8 seat 60 site=0054 ymd=20261105 scns=001 sseq=4 targets='C6 C7' end=202611051715
  *
- * 공통 키: label(알림 제목) · expire(YYYYMMDD 이후 통과)
+ * 예) CGV 좌석 연석 — J·L·M열 9~19번 중 붙은 두 자리가 함께 빌 때만 (PowerShell 쉼표 OK)
+ *   add dune2-pair seat 60 site=0059 ymd=20261215 scns=017 sseq=4 rows=J,L,M cols=9-19 adjacent=2 end=202612151900
+ *
+ * 공통 키: label(알림 제목) · expire(YYYYMMDD 이후 통과) · dry=1(푸시 대신 로그 — 점검용)
  * 재등록(add 같은 이름)하면 상태(알림 횟수·본 이벤트)도 초기화된다. 단 --keep-state 면 유지 —
  * 다른 PC에서 옮길 때 ~/.cinemo/watch/state/<이름>/seen.txt 를 먼저 넣고 쓰면 이미 알린 이벤트로 다시 울리지 않는다.
  *

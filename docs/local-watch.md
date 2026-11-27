@@ -17,12 +17,17 @@ pnpm --filter @cinemo/crawler watch-agent -- list
 pnpm --filter @cinemo/crawler watch-agent -- add dune-imax open 120 site=0059 date=2026-12-15..2026-12-20 movie=듄 format=IMAX
 pnpm --filter @cinemo/crawler watch-agent -- add lookback event 300 'match=룩백|look ?back' chains=megabox label=룩백 expire=20261201
 pnpm --filter @cinemo/crawler watch-agent -- add hateful8 seat 60 site=0054 ymd=20261105 scns=001 sseq=4 'targets=C6 C7' end=202611051715
+pnpm --filter @cinemo/crawler watch-agent -- add dune2-pair seat 60 site=0059 ymd=20261215 scns=017 sseq=4 rows=J,L,M cols=9-19 adjacent=2 end=202612151900
 pnpm --filter @cinemo/crawler watch-agent -- run dune-imax     # 스케줄러 없이 1회
 pnpm --filter @cinemo/crawler watch-agent -- test dune-imax    # 테스트 푸시 1건 (토픽·CA 경로 점검)
 pnpm --filter @cinemo/crawler watch-agent -- remove dune-imax
 ```
 
-- 공통 키: `label`(알림 제목) · `expire`(YYYYMMDD 이후 통과). 키 전체는 `src/watch/config.ts`.
+- 공통 키: `label`(알림 제목) · `expire`(YYYYMMDD 이후 통과) · `dry=1`(판정은 그대로, 폰 푸시 대신 로그 — 점검용). 키 전체는 `src/watch/config.ts`.
+- `seat`: 좌석은 `targets='C6 C7'` 또는 `rows=J,L,M cols=9-19`(쉼표·공백 구분, 둘 다 주면 합침). `adjacent=N`을 주면
+  고른 좌석 중 **붙어 있는 N자리가 모두 빌 때만** 묶음(`L13-L14`)으로 알린다. 붙어 있음은 번호가 아니라 CGV 좌석
+  응답의 배치로 판단 — 같은 줄(`seatRowNm`·`ycoordStartVal`), x 맞닿음(`xcoordEndVal`=다음 `xcoordStartVal`),
+  통로 표시(`rghtPwayYn`/`leftPwayYn`) 없음. 통로를 사이에 둔 두 자리(영등포 IMAX관 6|7번)는 연석이 아니다.
 - `open`의 `date=A..B` 범위나 `format`을 주면 ⓐ(회차 등장)만 알린다. 단일 날짜·포맷 없음이면
   ⓑ(날짜는 열렸는데 영화 없음 = 특별전 종료)도 알린다. 대형 극장 범위 감시에서 ⓑ는 매번 오탐.
 - 포맷은 **상영 포맷(`movkndDsplNm`)** 으로 판별한다. 관 이름은 안 된다 — IMAX관에서 일반 2D를

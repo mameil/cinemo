@@ -8,6 +8,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { expandRowsCols } from "./seat-groups";
 
 export const WATCH_HOME = join(homedir(), ".cinemo", "watch");
 
@@ -39,6 +40,8 @@ export interface SeatParams {
   targets: string[];
   /** 상영 시작 YYYYMMDDHHMM — 지나면 조용히 통과 */
   end: string;
+  /** 있으면 targets 중 붙어 있는 N자리가 모두 빌 때만 알린다 (seat-groups.ts) */
+  adjacent?: number;
 }
 
 interface WatchBase {
@@ -48,6 +51,8 @@ interface WatchBase {
   label?: string;
   /** 이 날짜(YYYYMMDD) 이후엔 조용히 통과 */
   expire?: string;
+  /** true 면 판정·상태 저장은 그대로, 폰 푸시만 로그로 대신 (점검용) */
+  dry?: boolean;
 }
 
 export type WatchConfig =
@@ -89,7 +94,13 @@ export function buildConfig(
   if (!Number.isInteger(intervalSec) || intervalSec < 60) {
     throw new Error(`주기는 60초 이상 정수: ${intervalSec}`);
   }
-  const base = { name, intervalSec, label: kv.label?.trim() || undefined, expire: kv.expire?.trim() || undefined };
+  const base = {
+    name,
+    intervalSec,
+    label: kv.label?.trim() || undefined,
+    expire: kv.expire?.trim() || undefined,
+    dry: kv.dry?.trim() === "1" || undefined,
+  };
   if (base.expire && !/^\d{8}$/.test(base.expire)) throw new Error(`expire 는 YYYYMMDD: ${base.expire}`);
 
   switch (kind) {
@@ -116,11 +127,20 @@ export function buildConfig(
       const end = req(kv, "end");
       if (!/^\d{8}$/.test(ymd)) throw new Error(`ymd 는 YYYYMMDD: ${ymd}`);
       if (!/^\d{12}$/.test(end)) throw new Error(`end 는 YYYYMMDDHHMM: ${end}`);
-      const targets = req(kv, "targets").split(/[\s,]+/).filter(Boolean);
+      // targets='C6 C7' 직접 또는 rows=J,L,M cols=9-19 (둘 다 주면 합친다)
+      const listed = (kv.targets ?? "").split(/[\s,]+/).filter(Boolean);
+      const grid = kv.rows || kv.cols ? expandRowsCols(kv.rows ?? "", kv.cols ?? "") : [];
+      const targets = [...new Set([...listed, ...grid])];
+      if (targets.length === 0) throw new Error("targets 또는 rows+cols 필요");
+      let adjacent: number | undefined;
+      if (kv.adjacent?.trim()) {
+        adjacent = Number(kv.adjacent);
+        if (!Number.isInteger(adjacent) || adjacent < 2) throw new Error(`adjacent 는 2 이상 정수: ${kv.adjacent}`);
+      }
       return {
         ...base,
         kind,
-        params: { site: req(kv, "site"), ymd, scns: req(kv, "scns"), sseq: req(kv, "sseq"), targets, end },
+        params: { site: req(kv, "site"), ymd, scns: req(kv, "scns"), sseq: req(kv, "sseq"), targets, end, adjacent },
       };
     }
     default:
@@ -157,7 +177,10 @@ export function displayLabel(cfg: WatchConfig): string {
       return cfg.params.format ? `${cfg.params.movie} ${cfg.params.format}` : cfg.params.movie;
     case "event":
       return cfg.params.match;
-    case "seat":
-      return `${cfg.params.ymd} 좌석 ${cfg.params.targets.join(" ")}`;
+    case "seat": {
+      const { ymd, targets, adjacent } = cfg.params;
+      const seats = targets.length <= 6 ? targets.join(" ") : `${targets[0]}…${targets.at(-1)} 중`;
+      return `${ymd} 좌석 ${seats}${adjacent ? ` 연석${adjacent}` : ""}`;
+    }
   }
 }

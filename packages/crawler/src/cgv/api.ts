@@ -278,6 +278,12 @@ export interface CgvSeat {
   seatRowNm: string; // 행 (예: "C")
   seatNo: string; // 번호 (예: "6")
   seatSaleYn: string; // "Y" = 판매 가능(빈자리)
+  // 배치 (좌석 한 칸 = x 2칸 폭, 통로는 x 한 칸 띄움) — 연석 판정용 (watch/seat-groups.ts)
+  xcoordStartVal: string; // "0015"
+  xcoordEndVal: string; // "0017"
+  ycoordStartVal: string; // 줄 위치
+  leftPwayYn: string; // "Y" = 왼쪽이 통로
+  rghtPwayYn: string; // "Y" = 오른쪽이 통로
 }
 
 /** 특정 회차 좌석 배치 — 좌석 감시(watch/run.ts seat)용 */
